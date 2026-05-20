@@ -22,10 +22,6 @@
     loader:                         ; the loader label (defined as entry point in linker script)
 	mov esp, kernel_stack + KERNEL_STACK_SIZE
     call kmain
-    out 0x3D4, 14      ; 14 tells the framebuffer to expect the highest 8 bits of the position
-    out 0x3D5, 0x00    ; sending the highest 8 bits of 0x0050
-    out 0x3D4, 15      ; 15 tells the framebuffer to expect the lowest 8 bits of the position
-    out 0x3D5, 0x50    ; sending the lowest 8 bits of 0x0050
     
     .loop:
         jmp .loop                   ; loop forever

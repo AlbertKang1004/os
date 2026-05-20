@@ -1,3 +1,5 @@
+#include "io.h"
+
 /* The Colors usable by text */
 #define COLOR_BLACK         0
 #define COLOR_BLUE          1
@@ -47,4 +49,5 @@ void fb_move_cursor(unsigned short pos)
 
 void kmain() {
 	fb_write_cell(0, 'A', COLOR_LIGHT_BLUE, COLOR_WHITE);
+	fb_move_cursor(0);
 }
