@@ -1,4 +1,5 @@
 #include "io.h"
+#include "gdt.h"
 
 /* The Colors usable by text */
 #define COLOR_BLACK         0
@@ -38,6 +39,12 @@
 * then the lowest 8 bits will follow
 */
 #define SERIAL_LINE_ENABLE_DLAB         0x80
+
+unsigned long long gdt[3] = {
+	0x0000000000000000, 
+	0x00CF9A000000FFFF,
+    0x00CF92000000FFFF
+};
 
 char *fb = (char *) 0x000B8000;
 
@@ -90,7 +97,59 @@ void fb_move_cursor(unsigned short pos)
 	outb(FB_DATA_PORT,    pos & 0x00FF);
 }
 
+/** serial_is_transmit_fifo_empty:
+ *  Checks whether the transmit FIFO queue is empty or not for the given COM
+ *  port.
+ *
+ *  @param  com The COM port
+ *  @return 0 if the transmit FIFO queue is not empty
+ *          1 if the transmit FIFO queue is empty
+ */
+int serial_is_transmit_fifo_empty(unsigned int com)
+{
+	/* 0x20 = 0010 0000 */
+	return inb(SERIAL_LINE_STATUS_PORT(com)) & 0x20;
+}
+
+/** serial_write:
+ *  Writes a text to the serial port.
+ * 
+ *  @param  com The COM port
+ * 	@param  text The text to be written to the port
+ */
+void serial_write(unsigned int com, char* text) {
+	while (*text != 0) {
+		while (!serial_is_transmit_fifo_empty(com));
+		// wait until buffer is empty
+		outb(SERIAL_DATA_PORT(com), *text++);
+	}
+}
+
+/** fb_write:
+ *  Writes a text to the framebuffer.
+ * 	@param  text 	The text to be written 
+ *  @param  bg   	Background Color
+ *  @param  fg   	Text Color
+ *  @param  offset  The offset for the text to be written
+ *  @return  0 if successfully written
+ * 			 1 if not
+ */
+int fb_write(char* text, unsigned char bg, unsigned char fg, unsigned int offset) {
+	while (*text != 0) {
+		fb[offset++] = *text++;
+		fb[offset++] = ((bg & 0x0F) << 4 | (fg & 0x0F));
+	}
+	return 0;
+}
+
 void kmain() {
-	fb_write_cell(0, 'A', COLOR_LIGHT_BLUE, COLOR_WHITE);
+	struct gdt_descriptor gdt_desc;
+	gdt_desc.size = sizeof(gdt) - 1;
+	gdt_desc.address = (unsigned int) gdt;
+	gdt_flush(&gdt_desc);
 	fb_move_cursor(0);
+	serial_configure_baud_rate(SERIAL_COM1_BASE, 1);
+	serial_configure_line(SERIAL_COM1_BASE);
+	serial_write(SERIAL_COM1_BASE, "Hello World!");
+	fb_write("Hello People and Computers.", COLOR_CYAN, COLOR_BLACK, 0);
 }

@@ -7,7 +7,7 @@
  *  @param port The address of the I/O port.
  *  @return     The read byte
  */
-void inb(unsigned short port);
+unsigned char inb(unsigned short port);
 
 /** outb:
  *  Sends the given data to the given I/O port. Defined in io.s
