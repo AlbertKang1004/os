@@ -1,5 +1,5 @@
-#ifndef INCLUDE_KEYBOARD_H
-#define INCLUDE_KEYBOARD_H
+#ifndef KEYBOARD_H
+#define KEYBOARD_H
 
 #define KBD_DATA_PORT        0x60
 

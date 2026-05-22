@@ -1,5 +1,5 @@
-#ifndef INCLUDE_SERIAL_H
-#define INCLUDE_SERIAL_H
+#ifndef SERIAL_H
+#define SERIAL_H
 
 #define SERIAL_COM1_BASE        0x3F8      /* COM1 base port */
 

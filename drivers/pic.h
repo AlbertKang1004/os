@@ -1,5 +1,5 @@
-#ifndef INCLUDE_PIC_H
-#define INCLUDE_PIC_H
+#ifndef PIC_H
+#define PIC_H
 
 #define PIC1_PORT_A          0x20
 #define PIC2_PORT_A          0xA0

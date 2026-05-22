@@ -1,5 +1,5 @@
-#ifndef INCLUDE_GDT_H
-#define INCLUDE_GDT_H
+#ifndef GDT_H
+#define GDT_H
 
 struct gdt_descriptor {
     unsigned short size;

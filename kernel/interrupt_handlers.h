@@ -1,5 +1,5 @@
-#ifndef INCLUDE_INTERRUPT_HANDLERS_H
-#define INCLUDE_INTERRUPT_HANDLERS_H
+#ifndef INTERRUPT_HANDLERS_H
+#define INTERRUPT_HANDLERS_H
 
 extern void (*interrupt_handlers[256])();
 extern void interrupt_handler_0();

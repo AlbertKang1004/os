@@ -1,5 +1,5 @@
-#ifndef INCLUDE_INTERRUPT_H
-#define INCLUDE_INTERRUPT_H
+#ifndef INTERRUPT_H
+#define INTERRUPT_H
 
 struct cpu_state {
     unsigned int edi;

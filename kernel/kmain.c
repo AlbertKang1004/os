@@ -5,6 +5,7 @@
 #include "../drivers/pic.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/serial.h"
+#include "multiboot.h"
 
 /* The Colors usable by text */
 #define COLOR_BLACK         0
@@ -31,6 +32,8 @@
 /* The I/O Port Commands */
 #define FB_HIGH_BYTE_COMMAND    14
 #define FB_LOW_BYTE_COMMAND     15
+
+typedef void (*call_module_t) (void);
 
 unsigned long long gdt[3] = {
 	0x0000000000000000, 
@@ -147,9 +150,16 @@ void create_idt_entry(unsigned int index, unsigned int handler) {
 	idt[index] = idt_e;
 }
 
-/* ================= UTILITY ================== */
+void kmain(unsigned int ebx) {
+	// multiboot
+	multiboot_info_t *mbinfo = (multiboot_info_t *)(unsigned long) ebx;
+	
+	if (!(mbinfo -> flags & 0x08)) return; // module info incorrect
+	if (mbinfo -> mods_count != 1) return; // not a single module
 
-void kmain() {
+	multiboot_module_t *module = (multiboot_module_t *)(unsigned long) mbinfo->mods_addr;
+	unsigned int module_address = module->mod_start;
+
 	struct gdt_descriptor gdt_desc;
 	gdt_desc.size = sizeof(gdt) - 1;
 	gdt_desc.address = (unsigned int)(unsigned long)  gdt;
@@ -160,8 +170,8 @@ void kmain() {
 	serial_configure_baud_rate(SERIAL_COM1_BASE, 1);
 	serial_configure_line(SERIAL_COM1_BASE);
 
-	serial_write(SERIAL_COM1_BASE, "Hello World!");
-	fb_write("Hello People and Computers.", COLOR_CYAN, COLOR_BLACK, 0);
+	serial_write(SERIAL_COM1_BASE, "Hello World!\n");
+	fb_write("Hello People and Computers.\n", COLOR_CYAN, COLOR_BLACK, 0);
 	
 	for (int i = 0; i < 256; i++) {
 		create_idt_entry(i, (unsigned int)(unsigned long) interrupt_handlers[i]);
@@ -175,4 +185,16 @@ void kmain() {
 	pic_remap(0x20, 0x28);
 	outb(0x21, 0x01);
 	__asm__("sti"); // activate PIC Interrupts
+
+	serial_write(SERIAL_COM1_BASE, "jumping to program\n");
+	serial_write(SERIAL_COM1_BASE, print_hex(module_address));
+	unsigned char *ptr = (unsigned char *)(unsigned long) module_address;
+	serial_write(SERIAL_COM1_BASE, print_hex(ptr[0]));
+	serial_write(SERIAL_COM1_BASE, print_hex(ptr[1]));
+	serial_write(SERIAL_COM1_BASE, print_hex(ptr[2]));
+	serial_write(SERIAL_COM1_BASE, print_hex(ptr[3]));
+	serial_write(SERIAL_COM1_BASE, print_hex(ptr[4]));
+
+	call_module_t start_program = (call_module_t)(unsigned long) module_address;
+	start_program();
 }

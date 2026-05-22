@@ -1,5 +1,5 @@
-#ifndef INCLUDE_IO_H
-#define INCLUDE_IO_H
+#ifndef IO_H
+#define IO_H
 
 /** inb:
  *  Read a byte from an I/O port.
