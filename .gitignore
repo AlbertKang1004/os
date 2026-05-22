@@ -1,2 +1,6 @@
 *.o
 *.out
+*.iso
+*.elf
+iso/modules/program
+com1.out
