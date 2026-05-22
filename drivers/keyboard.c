@@ -1,4 +1,4 @@
-#include "io.h"
+#include "../lib/io.h"
 #include "keyboard.h"
 
 /** read_scan_code:

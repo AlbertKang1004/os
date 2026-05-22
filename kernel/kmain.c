@@ -1,9 +1,10 @@
-#include "io.h"
+#include "../lib/io.h"
 #include "gdt.h"
 #include "interrupt.h"
 #include "interrupt_handlers.h"
-#include "pic.h"
-#include "keyboard.h"
+#include "../drivers/pic.h"
+#include "../drivers/keyboard.h"
+#include "../drivers/serial.h"
 
 /* The Colors usable by text */
 #define COLOR_BLACK         0
@@ -26,23 +27,10 @@
 /* The I/O ports */
 #define FB_COMMAND_PORT         0x3D4
 #define FB_DATA_PORT            0x3D5
-#define SERIAL_COM1_BASE        0x3F8      /* COM1 base port */
-
-#define SERIAL_DATA_PORT(base)          (base)
-#define SERIAL_FIFO_COMMAND_PORT(base)  (base + 2)
-#define SERIAL_LINE_COMMAND_PORT(base)  (base + 3)
-#define SERIAL_MODEM_COMMAND_PORT(base) (base + 4)
-#define SERIAL_LINE_STATUS_PORT(base)   (base + 5)
 
 /* The I/O Port Commands */
 #define FB_HIGH_BYTE_COMMAND    14
 #define FB_LOW_BYTE_COMMAND     15
-
-/* SERIAL_LINE_ENABLE_DLAB:
-* Tells the serial port to expect first the highest 8 bits on the data port,
-* then the lowest 8 bits will follow
-*/
-#define SERIAL_LINE_ENABLE_DLAB         0x80
 
 unsigned long long gdt[3] = {
 	0x0000000000000000, 
@@ -53,66 +41,6 @@ unsigned long long gdt[3] = {
 struct idt_entry idt[256];
 
 char *fb = (char *) 0x000B8000;
-
-/* =============== SERIAL PORT ================ */
-
-/** serial_configure_baud_rate:
- *  Sets the speed of the data being sent. The default speed of a serial
- *  port is 115200 bits/s. The argument is a divisor of that number, hence
- *  the resulting speed becomes (115200 / divisor) bits/s.
- *
- *  @param com      The COM port to configure
- *  @param divisor  The divisor
- */
-void serial_configure_baud_rate(unsigned short com, unsigned short divisor) {
-	outb(SERIAL_LINE_COMMAND_PORT(com), SERIAL_LINE_ENABLE_DLAB);
-	outb(SERIAL_DATA_PORT(com), 		(divisor >> 8) & 0x00FF);
-	outb(SERIAL_DATA_PORT(com), 		divisor & 0x00FF);
-}
-
-/** serial_configure_line:
- *  Configures the line of the given serial port. The port is set to have a
- *  data length of 8 bits, no parity bits, one stop bit and break control
- *  disabled.
- *
- *  @param com  The serial port to configure
- */
-void serial_configure_line(unsigned short com)
-{
-	/* Bit:    | 7 | 6 | 5 4 3 | 2 | 1 0 |
-	* Content: | d | b | prty  | s | dl  |
-	* Value:   | 0 | 0 | 0 0 0 | 0 | 1 1 | = 0x03
-	*/
-	outb(SERIAL_LINE_COMMAND_PORT(com), 0x03);
-}
-
-/** serial_is_transmit_fifo_empty:
- *  Checks whether the transmit FIFO queue is empty or not for the given COM
- *  port.
- *
- *  @param  com The COM port
- *  @return 0 if the transmit FIFO queue is not empty
- *          1 if the transmit FIFO queue is empty
- */
-int serial_is_transmit_fifo_empty(unsigned int com)
-{
-	/* 0x20 = 0010 0000 */
-	return inb(SERIAL_LINE_STATUS_PORT(com)) & 0x20;
-}
-
-/** serial_write:
- *  Writes a text to the serial port.
- * 
- *  @param  com The COM port
- * 	@param  text The text to be written to the port
- */
-void serial_write(unsigned int com, char* text) {
-	while (*text != 0) {
-		while (!serial_is_transmit_fifo_empty(com));
-		// wait until buffer is empty
-		outb(SERIAL_DATA_PORT(com), *text++);
-	}
-}
 
 /* =============== FRAMEBUFFER ================ */
 
