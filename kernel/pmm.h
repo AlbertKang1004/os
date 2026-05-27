@@ -1,8 +1,8 @@
 #ifndef PMM_H
 #define PMM_H
 
-#define PAGE_SIZE 0x400000
-#define MAX_PAGES 32 
+#define PAGE_SIZE 0x1000 // 4KB
+#define MAX_PAGES 32768
 
 struct mmap_entry {
     unsigned int size;      // size of this entry (excluding this field)
@@ -13,7 +13,7 @@ struct mmap_entry {
     unsigned int type;      // 1 = available, other = reserved
 } __attribute__((packed));
 
-extern unsigned int page_bitmap;
+extern unsigned int page_bitmap[1024];
 
 void pmm_init(unsigned int map_addr, unsigned int map_length);
 unsigned int pmm_alloc();

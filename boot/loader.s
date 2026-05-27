@@ -1,10 +1,7 @@
 ; EXPORT TO KMAIN.C
 global loader                       ; the entry symbol for ELF
 global page_directory
-global kernel_virtual_start
-global kernel_virtual_end
-global kernel_physical_start
-global kernel_physical_end
+global page_table
 global multiboot_mods_addr
 global multiboot_mmap_addr
 global multiboot_mmap_length
@@ -27,11 +24,15 @@ multiboot_mods_addr:    resd 1
 multiboot_mmap_addr:    resd 1
 multiboot_mmap_length:  resd 1
 
-align 4096                          ; page directory must be 4KB aligned
+alignb 4096                          ; page directory must be 4KB aligned
 page_directory:
     resb 4096                       ; reserve 4KB for page directory
 
-align 4
+alignb 4096
+page_table:
+    resb 4096
+
+alignb 4
 kernel_stack:                       ; label points to beginning of stack memory
     resb KERNEL_STACK_SIZE          ; reserve stack for the kernel
 
@@ -51,8 +52,26 @@ clear_loop:                         ; clear all page directory entries to 0
     mov dword [eax + ecx * 4], 0x0
     jnz clear_loop
 
-    mov dword [eax],             0x00000083  ; 0x00000000 -> 0x00000000
-    mov dword [eax + (768 * 4)], 0x00000083  ; 0xC0000000 -> 0x00000000
+    ; populating page table (0 - 4MB)
+    mov ecx, page_table - KERNEL_VIRTUAL_BASE
+    mov edx, 0                      ; physical address
+    mov esi, 0                      ; index
+   
+fill_pt:
+    cmp esi, 1023
+    je skip_entry
+    mov dword [ecx + esi * 4], edx  
+    or  dword [ecx + esi * 4], 0x03
+skip_entry: 
+    add edx, 0x1000                 ; add 4KB every time
+    inc esi
+    cmp esi, 1024
+    jl fill_pt
+
+    mov edx, page_table - KERNEL_VIRTUAL_BASE
+    or edx, 0x03
+    mov dword [eax], edx            ; [0] identity mapping
+    mov dword [eax + (768*4)], edx  ; [768] higher half
 
     ; save multiboot info before paging
     mov esi, [edi + 24]                           ; mods_addr
@@ -63,11 +82,6 @@ clear_loop:                         ; clear all page directory entries to 0
     mov [multiboot_mmap_addr - KERNEL_VIRTUAL_BASE], esi
 
     mov cr3, eax                    ; load page directory address into cr3
-
-    mov ebx, cr4                    ; read current cr4
-    or  ebx, 0x00000010             ; set PSE bit (enable 4MB pages)
-    mov cr4, ebx                    ; update cr4
-
     mov ebx, cr0                    ; read current cr0
     or  ebx, 0x80000000             ; set PG bit (enable paging)
     mov cr0, ebx                    ; update cr0
@@ -76,9 +90,8 @@ clear_loop:                         ; clear all page directory entries to 0
     jmp ebx
     
 higher_half:
-    ; mov dword [page_directory - 0xC0000000], 0x0
-    ; invlpg [0]
-    ; this is dealed by kmain.c
+    mov dword [page_directory - 0xC0000000], 0x0
+    invlpg [0]
     mov esp, kernel_stack + KERNEL_STACK_SIZE   ; set up the stack
     call kmain                      ; call the C kernel
 .loop:
