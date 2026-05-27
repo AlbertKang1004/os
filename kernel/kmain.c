@@ -6,6 +6,8 @@
 #include "../drivers/keyboard.h"
 #include "../drivers/serial.h"
 #include "multiboot.h"
+#include "pmm.h"
+#include "utils.h"
 
 /* The Colors usable by text */
 #define COLOR_BLACK         0
@@ -33,7 +35,17 @@
 #define FB_HIGH_BYTE_COMMAND    14
 #define FB_LOW_BYTE_COMMAND     15
 
+extern unsigned int page_directory;
+extern unsigned int multiboot_mods_addr;
+extern unsigned int multiboot_mmap_addr;
+extern unsigned int multiboot_mmap_length;
+
 typedef void (*call_module_t) (void);
+
+void kernel_physical_start(void);
+void kernel_physical_end(void);
+void kernel_virtual_start(void);
+void kernel_virtual_end(void);
 
 unsigned long long gdt[3] = {
 	0x0000000000000000, 
@@ -43,7 +55,7 @@ unsigned long long gdt[3] = {
 
 struct idt_entry idt[256];
 
-char *fb = (char *) 0x000B8000;
+char *fb = (char *) 0xC00B8000;
 
 /* =============== FRAMEBUFFER ================ */
 
@@ -91,23 +103,6 @@ int fb_write(char* text, unsigned char bg, unsigned char fg, unsigned int offset
 	return 0;
 }
 
-/** print_hex:
- *  Converts an unsigned integer to a hexadecimal string
- *
- *  @param n    The unsigned integer to convert
- *  @return     The hexadecimal string representation of n
- */
-char *print_hex(unsigned int n) {
-    static char hex[] = "0x00000000";
-    int i;
-    for (i = 9; i >= 2; i--) {
-        int digit = n & 0xF;
-        hex[i] = digit < 10 ? '0' + digit : 'A' + digit - 10;
-        n >>= 4;
-    }
-    return hex;
-}
-
 /* ================ INTERRUPT ================= */
 
 /** interrupt_handler:
@@ -150,25 +145,22 @@ void create_idt_entry(unsigned int index, unsigned int handler) {
 	idt[index] = idt_e;
 }
 
-void kmain(unsigned int ebx) {
-	// multiboot
-	multiboot_info_t *mbinfo = (multiboot_info_t *)(unsigned long) ebx;
-	
-	if (!(mbinfo -> flags & 0x08)) return; // module info incorrect
-	if (mbinfo -> mods_count != 1) return; // not a single module
-
-	multiboot_module_t *module = (multiboot_module_t *)(unsigned long) mbinfo->mods_addr;
-	unsigned int module_address = module->mod_start;
+void kmain() {
+	__asm__("movl $0, (page_directory)");  
+	__asm__("invlpg (0)");   
 
 	struct gdt_descriptor gdt_desc;
 	gdt_desc.size = sizeof(gdt) - 1;
 	gdt_desc.address = (unsigned int)(unsigned long)  gdt;
 	gdt_flush(&gdt_desc);
-
 	fb_move_cursor(0);
 
 	serial_configure_baud_rate(SERIAL_COM1_BASE, 1);
 	serial_configure_line(SERIAL_COM1_BASE);
+
+	serial_write(SERIAL_COM1_BASE, "multiboot addr: ");
+	serial_write(SERIAL_COM1_BASE, print_hex(multiboot_mods_addr));
+	serial_write(SERIAL_COM1_BASE, "\n");
 
 	serial_write(SERIAL_COM1_BASE, "Hello World!\n");
 	fb_write("Hello People and Computers.\n", COLOR_CYAN, COLOR_BLACK, 0);
@@ -176,7 +168,6 @@ void kmain(unsigned int ebx) {
 	for (int i = 0; i < 256; i++) {
 		create_idt_entry(i, (unsigned int)(unsigned long) interrupt_handlers[i]);
 	} 
-
 	struct idt_descriptor idt_desc;
 	idt_desc.size = sizeof(idt);
 	idt_desc.address = (unsigned int)(unsigned long) idt;
@@ -186,15 +177,33 @@ void kmain(unsigned int ebx) {
 	outb(0x21, 0x01);
 	__asm__("sti"); // activate PIC Interrupts
 
-	serial_write(SERIAL_COM1_BASE, "jumping to program\n");
-	serial_write(SERIAL_COM1_BASE, print_hex(module_address));
-	unsigned char *ptr = (unsigned char *)(unsigned long) module_address;
-	serial_write(SERIAL_COM1_BASE, print_hex(ptr[0]));
-	serial_write(SERIAL_COM1_BASE, print_hex(ptr[1]));
-	serial_write(SERIAL_COM1_BASE, print_hex(ptr[2]));
-	serial_write(SERIAL_COM1_BASE, print_hex(ptr[3]));
-	serial_write(SERIAL_COM1_BASE, print_hex(ptr[4]));
+	unsigned int virt_start  = (unsigned int)(unsigned long) &kernel_virtual_start;
+	unsigned int virt_end    = (unsigned int)(unsigned long) &kernel_virtual_end;
+	unsigned int phys_start  = (unsigned int)(unsigned long) &kernel_physical_start;
+	unsigned int phys_end    = (unsigned int)(unsigned long) &kernel_physical_end;
 
-	call_module_t start_program = (call_module_t)(unsigned long) module_address;
+	multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (multiboot_mods_addr + KERNEL_VIRTUAL_BASE);
+	serial_write(SERIAL_COM1_BASE, "mmap_addr: ");
+	serial_write(SERIAL_COM1_BASE, print_hex(multiboot_mmap_addr));
+	serial_write(SERIAL_COM1_BASE, "\n");
+	serial_write(SERIAL_COM1_BASE, "mmap_length: ");
+	serial_write(SERIAL_COM1_BASE, print_hex(multiboot_mmap_length));
+	serial_write(SERIAL_COM1_BASE, "\n");
+	pmm_init(multiboot_mmap_addr + 0xC0000000, multiboot_mmap_length);
+	serial_write(SERIAL_COM1_BASE, "bitmap: ");
+	serial_write(SERIAL_COM1_BASE, print_hex(page_bitmap));
+	serial_write(SERIAL_COM1_BASE, "\n");
+	struct mmap_entry *e = (struct mmap_entry *)(unsigned long)(multiboot_mmap_addr + 0xC0000000);
+	while ((unsigned int)e < multiboot_mmap_addr + 0xC0000000 + multiboot_mmap_length) {
+		serial_write(SERIAL_COM1_BASE, "addr: ");
+		serial_write(SERIAL_COM1_BASE, print_hex(e->addr_low));
+		serial_write(SERIAL_COM1_BASE, " len: ");
+		serial_write(SERIAL_COM1_BASE, print_hex(e->len_low));
+		serial_write(SERIAL_COM1_BASE, " type: ");
+		serial_write(SERIAL_COM1_BASE, print_hex(e->type));
+		serial_write(SERIAL_COM1_BASE, "\n");
+		e = (struct mmap_entry *)((unsigned int)e + e->size + 4);
+	}
+	call_module_t start_program = (call_module_t)(unsigned long) module->mod_start + KERNEL_VIRTUAL_BASE;
 	start_program();
 }

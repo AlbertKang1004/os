@@ -4,12 +4,15 @@ OBJECTS = boot/loader.o \
           kernel/gdt.o \
           kernel/interrupt.o \
           kernel/interrupt_handlers.o \
+		  kernel/multiboot.o \
+		  kernel/pmm.o \
+		  kernel/utils.o \
           drivers/pic.o \
           drivers/keyboard.o \
           drivers/serial.o						
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
-         -nostartfiles -nodefaultlibs -Wall -Wextra -Werror -c
+         -nostartfiles -nodefaultlibs -Wall -Wextra -c -Wno-int-to-pointer-cast #-Werror 
 LDFLAGS = -T link.ld -melf_i386
 AS = nasm
 ASFLAGS = -f elf32

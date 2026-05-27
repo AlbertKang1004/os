@@ -1,5 +1,6 @@
 #ifndef MULTIBOOT_H
 #define MULTIBOOT_H
+#define KERNEL_VIRTUAL_BASE 0xC0000000
 
 typedef struct multiboot_info {
     unsigned int flags;
@@ -25,5 +26,7 @@ typedef struct {
     unsigned int string;
     unsigned int reserved;
 } __attribute__((packed)) multiboot_module_t;
+
+void multiboot_relocate(multiboot_info_t *mbinfo);
 
 #endif
