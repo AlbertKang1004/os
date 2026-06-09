@@ -4,9 +4,11 @@ OBJECTS = boot/loader.o \
           kernel/gdt.o \
           kernel/interrupt.o \
           kernel/interrupt_handlers.o \
+		  kernel/kmalloc.o \
 		  kernel/multiboot.o \
 		  kernel/pmm.o \
 		  kernel/utils.o \
+		  kernel/vmm.o \
           drivers/pic.o \
           drivers/keyboard.o \
           drivers/serial.o						

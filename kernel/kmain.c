@@ -6,9 +6,11 @@
 #include "../drivers/keyboard.h"
 #include "../drivers/serial.h"
 #include "debug.h"
+#include "kmalloc.h"
 #include "multiboot.h"
 #include "pmm.h"
 #include "utils.h"
+#include "vmm.h"
 
 /* The Colors usable by text */
 #define COLOR_BLACK         0
@@ -147,8 +149,6 @@ void kmain() {
     fb_move_cursor(0);
     serial_configure_baud_rate(SERIAL_COM1_BASE, 1);
     serial_configure_line(SERIAL_COM1_BASE);
-    LOG_HEX("multiboot addr", multiboot_mods_addr);
-    LOG("Hello World!");
     fb_write("Hello People and Computers.\n", COLOR_CYAN, COLOR_BLACK, 0);
 
     // IDT setup
@@ -165,21 +165,51 @@ void kmain() {
     outb(0x21, 0x01);
     __asm__("sti");
 
-    // Kernel virtual/physical address labels
+    // Physical memory manager init
+    pmm_init(multiboot_mmap_addr + 0xC0000000, multiboot_mmap_length);
+
+    // testing goes here...
+    // Test 1: basic allocation
+    unsigned int *a = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
+    if (a == 0) {
+        serial_write(SERIAL_COM1_BASE, "kmalloc a failed\n");
+    } else {
+        a[0] = 1; a[1] = 2; a[2] = 3; a[3] = 4;
+        LOG_HEX("a[0]", a[0]);
+        LOG_HEX("a[1]", a[1]);
+        LOG_HEX("a[2]", a[2]);
+        LOG_HEX("a[3]", a[3]);
+    }
+
+    // Test 2: second allocation should be at different address
+    unsigned int *b = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
+    if (b == 0) {
+        serial_write(SERIAL_COM1_BASE, "kmalloc b failed\n");
+    } else {
+        b[0] = 10; b[1] = 20;
+        LOG_HEX("b[0]", b[0]);
+        LOG_HEX("b[1]", b[1]);
+    }
+
+    // Test 3: free a and reallocate, should reuse same address
+    kfree(a);
+    unsigned int *c = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
+    LOG_HEX("a addr", (unsigned int)(unsigned long)a);
+    LOG_HEX("c addr", (unsigned int)(unsigned long)c);
+    // if a == c, kfree and reuse working correctly
+    // Jump to user module
+    multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (multiboot_mods_addr + KERNEL_VIRTUAL_BASE);
+    call_module_t start_program = (call_module_t)(unsigned long) module->mod_start + KERNEL_VIRTUAL_BASE;
+    start_program();
+}
+
+/* DEBUGGING PMM
     unsigned int virt_start  = (unsigned int)(unsigned long) &kernel_virtual_start;
     unsigned int virt_end    = (unsigned int)(unsigned long) &kernel_virtual_end;
     unsigned int phys_start  = (unsigned int)(unsigned long) &kernel_physical_start;
     unsigned int phys_end    = (unsigned int)(unsigned long) &kernel_physical_end;
-
-    // Multiboot module
-    multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (multiboot_mods_addr + KERNEL_VIRTUAL_BASE);
-
-    // Physical memory manager init
     LOG_HEX("mmap_addr", multiboot_mmap_addr);
     LOG_HEX("mmap_length", multiboot_mmap_length);
-    pmm_init(multiboot_mmap_addr + 0xC0000000, multiboot_mmap_length);
-
-    // Dump mmap entries
     struct mmap_entry *e = (struct mmap_entry *)(unsigned long)(multiboot_mmap_addr + 0xC0000000);
     while ((unsigned int)e < multiboot_mmap_addr + 0xC0000000 + multiboot_mmap_length) {
         LOG_HEX("addr", e->addr_low);
@@ -187,22 +217,33 @@ void kmain() {
         LOG_HEX("type", e->type);
         e = (struct mmap_entry *)((unsigned int)e + e->size + 4);
     }
-
-    // Verify kernel pages are marked as used
     LOG_HEX("kernel phys_start", phys_start);
     LOG_HEX("kernel phys_end", phys_end);
     unsigned int start_page = phys_start / 0x1000;
     LOG_HEX("start_page", start_page);
     LOG_HEX("bitmap at kernel", page_bitmap[start_page / 32]);
-
-    // Test pmm_alloc / pmm_free
     unsigned int frame = pmm_alloc();
     LOG_HEX("allocated", frame);
     pmm_free(frame);
     unsigned int frame2 = pmm_alloc();
     LOG_HEX("allocated after free", frame2);
+ */
 
-    // Jump to user module
-    call_module_t start_program = (call_module_t)(unsigned long) module->mod_start + KERNEL_VIRTUAL_BASE;
-    start_program();
-}
+ /* DEBUGGING VMM
+    unsigned int phys = pmm_alloc();
+    LOG_HEX("phys allocated", phys);
+
+    vmm_map_page(phys, 0xD0000000, PAGE_PRESENT | PAGE_RW);
+
+    unsigned int *test = (unsigned int *)0xD0000000;
+    *test = 0xDEADBEEF;
+    LOG_HEX("value at 0xD0000000", *test);
+
+    unsigned int resolved = vmm_get_phys(0xD0000000);
+    LOG_HEX("resolved phys", resolved);
+
+    vmm_unmap_page(0xD0000000);
+    unsigned int after = vmm_get_phys(0xD0000000);
+    LOG_HEX("after unmap", after);
+
+ */
