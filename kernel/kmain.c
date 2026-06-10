@@ -12,24 +12,6 @@
 #include "utils.h"
 #include "vmm.h"
 
-/* The Colors usable by text */
-#define COLOR_BLACK         0
-#define COLOR_BLUE          1
-#define COLOR_GREEN         2
-#define COLOR_CYAN          3
-#define COLOR_RED           4
-#define COLOR_MAGENTA       5
-#define COLOR_BROWN         6
-#define COLOR_LIGHT_GREY    7
-#define COLOR_DARK_GREY     8
-#define COLOR_LIGHT_BLUE    9
-#define COLOR_LIGHT_GREEN   10
-#define COLOR_LIGHT_CYAN    11
-#define COLOR_LIGHT_RED     12
-#define COLOR_LIGHT_MAGENTA 13
-#define COLOR_LIGHT_BROWN   14
-#define COLOR_WHITE         15
-
 extern unsigned int multiboot_mods_addr;
 extern unsigned int multiboot_mmap_addr;
 extern unsigned int multiboot_mmap_length;
@@ -39,14 +21,10 @@ extern unsigned int kernel_virtual_start;
 extern unsigned int kernel_virtual_end;
 extern unsigned int kernel_physical_start;
 extern unsigned int kernel_physical_end;
+extern unsigned int gdt_size;
+extern struct gdt_entry gdt[];
 
 typedef void (*call_module_t) (void);
-
-unsigned long long gdt[3] = {
-	0x0000000000000000, 
-	0x00CF9A000000FFFF,
-    0x00CF92000000FFFF
-};
 
 struct idt_entry idt[256];
 
@@ -140,8 +118,21 @@ void create_idt_entry(unsigned int index, unsigned int handler) {
 
 void kmain() {
     // GDT setup
+
+    // Index 	Offset 	Name 	            Address range 	            Type 	DPL
+    // 0 	    0x00 	null descriptor 			
+    // 1 	    0x08 	kernel code segment 0x00000000 - 0xFFFFFFFF 	RX 	    PL0
+    // 2 	    0x10 	kernel data segment 0x00000000 - 0xFFFFFFFF 	RW 	    PL0
+    // 3 	    0x18 	user code segment 	0x00000000 - 0xFFFFFFFF 	RX 	    PL3
+    // 4 	    0x20 	user data segment 	0x00000000 - 0xFFFFFFFF 	RW 	    PL3
+    gdt_set_entry(0, 0, 0,          0,    0);       // null
+    gdt_set_entry(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);    // kernel code PL0
+    gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF);    // kernel data PL0
+    gdt_set_entry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);    // user code PL3
+    gdt_set_entry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);    // user data PL3
+    
     struct gdt_descriptor gdt_desc;
-    gdt_desc.size = sizeof(gdt) - 1;
+    gdt_desc.size = gdt_size - 1;
     gdt_desc.address = (unsigned int)(unsigned long) gdt;
     gdt_flush(&gdt_desc);
 
@@ -169,34 +160,7 @@ void kmain() {
     pmm_init(multiboot_mmap_addr + 0xC0000000, multiboot_mmap_length);
 
     // testing goes here...
-    // Test 1: basic allocation
-    unsigned int *a = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
-    if (a == 0) {
-        serial_write(SERIAL_COM1_BASE, "kmalloc a failed\n");
-    } else {
-        a[0] = 1; a[1] = 2; a[2] = 3; a[3] = 4;
-        LOG_HEX("a[0]", a[0]);
-        LOG_HEX("a[1]", a[1]);
-        LOG_HEX("a[2]", a[2]);
-        LOG_HEX("a[3]", a[3]);
-    }
-
-    // Test 2: second allocation should be at different address
-    unsigned int *b = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
-    if (b == 0) {
-        serial_write(SERIAL_COM1_BASE, "kmalloc b failed\n");
-    } else {
-        b[0] = 10; b[1] = 20;
-        LOG_HEX("b[0]", b[0]);
-        LOG_HEX("b[1]", b[1]);
-    }
-
-    // Test 3: free a and reallocate, should reuse same address
-    kfree(a);
-    unsigned int *c = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
-    LOG_HEX("a addr", (unsigned int)(unsigned long)a);
-    LOG_HEX("c addr", (unsigned int)(unsigned long)c);
-    // if a == c, kfree and reuse working correctly
+    
     // Jump to user module
     multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (multiboot_mods_addr + KERNEL_VIRTUAL_BASE);
     call_module_t start_program = (call_module_t)(unsigned long) module->mod_start + KERNEL_VIRTUAL_BASE;
@@ -245,5 +209,36 @@ void kmain() {
     vmm_unmap_page(0xD0000000);
     unsigned int after = vmm_get_phys(0xD0000000);
     LOG_HEX("after unmap", after);
+ */
 
+ /* DEBUGGING MEMORY ALLOCATION
+
+    // Test 1: basic allocation
+    unsigned int *a = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
+    if (a == 0) {
+        serial_write(SERIAL_COM1_BASE, "kmalloc a failed\n");
+    } else {
+        a[0] = 1; a[1] = 2; a[2] = 3; a[3] = 4;
+        LOG_HEX("a[0]", a[0]);
+        LOG_HEX("a[1]", a[1]);
+        LOG_HEX("a[2]", a[2]);
+        LOG_HEX("a[3]", a[3]);
+    }
+
+    // Test 2: second allocation should be at different address
+    unsigned int *b = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
+    if (b == 0) {
+        serial_write(SERIAL_COM1_BASE, "kmalloc b failed\n");
+    } else {
+        b[0] = 10; b[1] = 20;
+        LOG_HEX("b[0]", b[0]);
+        LOG_HEX("b[1]", b[1]);
+    }
+
+    // Test 3: free a and reallocate, should reuse same address
+    kfree(a);
+    unsigned int *c = (unsigned int *)kmalloc(sizeof(unsigned int) * 4);
+    LOG_HEX("a addr", (unsigned int)(unsigned long)a);
+    LOG_HEX("c addr", (unsigned int)(unsigned long)c);
+    // if a == c, kfree and reuse working correctly
  */
