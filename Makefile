@@ -7,6 +7,7 @@ OBJECTS = boot/loader.o \
 		  kernel/kmalloc.o \
 		  kernel/multiboot.o \
 		  kernel/pmm.o \
+		  kernel/process.o \
 		  kernel/utils.o \
 		  kernel/vmm.o \
           drivers/pic.o \

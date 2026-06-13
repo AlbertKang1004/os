@@ -17,8 +17,12 @@ static unsigned int bitmap_test(unsigned int page) {
     return page_bitmap[page / 32] & (1 << (page % 32));
 }
 
-/** pmm_init:
- *  Initializes the physical memory manager bitmap
+/**
+ * pmm_init:
+ * Initializes the physical memory manager bitmap
+ *
+ * @param map_addr    Physical address of the BIOS/bootloader-provided memory map
+ * @param map_length  Total byte length of the memory map structure
  */
 void pmm_init(unsigned int map_addr, unsigned int map_length) {
     for (unsigned int i = 0; i < 1024; i++)

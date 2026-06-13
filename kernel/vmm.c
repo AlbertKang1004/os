@@ -133,14 +133,3 @@ unsigned int vmm_get_phys(unsigned int virt) {
     return phys_addr;
 }
 
-/**
- * tlb_flush:
- *   Invalidates a single TLB entry for the given virtual address.
- *   Must be called after modifying a page table entry to ensure
- *   the CPU uses the updated mapping.
- *
- * @param virt  Virtual address whose TLB entry should be invalidated
- */
-static inline void tlb_flush(unsigned int virt) {
-    __asm__ volatile("invlpg (%0)" : : "r"(virt) : "memory");
-}
