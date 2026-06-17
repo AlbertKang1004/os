@@ -1,7 +1,6 @@
 ; EXPORT TO KMAIN.C
 global loader                       ; the entry symbol for ELF
 global page_directory
-global page_table
 global multiboot_mods_addr
 global multiboot_mmap_addr
 global multiboot_mmap_length
@@ -54,16 +53,12 @@ clear_loop:                         ; clear all page directory entries to 0
 
     ; populating page table (0 - 4MB)
     mov ecx, page_table - KERNEL_VIRTUAL_BASE
-    mov edx, 0                      ; physical address
+    mov edx, 0x03                   ; physical address 0, present + rw flags
     mov esi, 0                      ; index
    
 fill_pt:
-    cmp esi, 1023
-    je skip_entry
-    mov dword [ecx + esi * 4], edx  
-    or  dword [ecx + esi * 4], 0x03
-skip_entry: 
-    add edx, 0x1000                 ; add 4KB every time
+    mov dword [ecx + esi * 4], edx
+    add edx, 0x1000                 ; next frame; flag bits ride along
     inc esi
     cmp esi, 1024
     jl fill_pt
@@ -72,6 +67,9 @@ skip_entry:
     or edx, 0x03
     mov dword [eax], edx            ; [0] identity mapping
     mov dword [eax + (768*4)], edx  ; [768] higher half
+    mov edx, eax                    ; copy eax value to edx
+    or  edx, 0x03                   ; enable flag
+    mov dword [eax + (1023*4)], edx ; [1023] itself (recursive mapping)
 
     ; save multiboot info before paging
     mov esi, [edi + 24]                           ; mods_addr

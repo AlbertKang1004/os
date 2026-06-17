@@ -2,14 +2,6 @@
 #include "pmm.h"
 #include "utils.h"
 
-#define PAGE_PRESENT    0x01
-#define PAGE_RW         0x02
-#define PAGE_USER       0x04
-#define PAGE_KERNEL     0x00
-
-extern unsigned int page_directory[];
-extern unsigned int page_table[];
-
 /**
  * vmm_map_page:
  *   Maps a physical frame to a virtual address in the current page directory.
@@ -25,46 +17,19 @@ int vmm_map_page(unsigned int phys, unsigned int virt, unsigned int flags) {
     unsigned int pd_index = virt >> 22;
     unsigned int pt_index = (virt >> 12) & 0x3FF;
 
-    if (!(page_directory[pd_index] & PAGE_PRESENT)) { // present bit false
-        // page table does not exist
+    if (!(PD_VIRT[pd_index] & PAGE_PRESENT)) { // page table does not exist
         unsigned int new_pt_phys = pmm_alloc();
-        if (new_pt_phys == 0) return -1;
-        
-        // temporarily map and zero out the space
-        page_table[1023] = new_pt_phys | PAGE_PRESENT | PAGE_RW;
-        tlb_flush(0xC03FF000);
+        if (new_pt_phys == 0) return -1; // out of memory
 
-        // zero out the new page table 
-        kmemset((void *)0xC03FF000, 0, 4096);
-
-        // writing entry at 1023 while still mapped
-        unsigned int *tmp_pt = (unsigned int *) 0xC03FF000;
-        tmp_pt[pt_index] = phys | flags | PAGE_PRESENT;
-
-        // Register new page table in page directory
-        page_directory[pd_index] = new_pt_phys | flags | PAGE_PRESENT;    
-        tlb_flush(virt);
-
-        // remove temp mapping
-        page_table[1023] = 0;
-        tlb_flush(0xC03FF000);
-
-        return 0;
+        // install new table in directory (must be present before we touch its window)
+        PD_VIRT[pd_index] = new_pt_phys | PAGE_PRESENT | PAGE_RW;
+        tlb_flush((unsigned int) PT_VIRT(pd_index)); // PDE changed -> refresh window
+        kmemset(PT_VIRT(pd_index), 0, 4096); // zero the new table
     }
 
-    // page table already exists, use temp mapping to access it
-    unsigned int pt_phys = page_directory[pd_index] & ~0xFFF;
-    page_table[1023] = pt_phys | PAGE_PRESENT | PAGE_RW;
-    tlb_flush(0xC03FF000);
-
-    unsigned int *tmp_pt = (unsigned int *)0xC03FF000;
-    tmp_pt[pt_index] = phys | flags | PAGE_PRESENT;
-
-    // remove temp mapping
-    page_table[1023] = 0;
-    tlb_flush(0xC03FF000);
-
-    tlb_flush(virt);
+    // write the mapping virt -> phys
+    PT_VIRT(pd_index)[pt_index] = phys | flags | PAGE_PRESENT;
+    tlb_flush(virt); // refresh the mapped address
     return 0;
 }
 
@@ -81,18 +46,17 @@ void vmm_unmap_page(unsigned int virt) {
     unsigned int pt_index = (virt >> 12) & 0x3FF;
 
     // if page directory entry is empty -> return
-    if (!(page_directory[pd_index] & PAGE_PRESENT)) return;
+    if (!(PD_VIRT[pd_index] & PAGE_PRESENT)) return;
 
-    // access page table by temp mapping
-    unsigned int pt = page_directory[pd_index] & ~0xFFF;
-    page_table[1023] = pt | PAGE_PRESENT | PAGE_RW;
-    tlb_flush(0xC03FF000);
+    // clear the PTE for virt via the recursive window (PT_VIRT)
+    PT_VIRT(pd_index)[pt_index] = 0;
 
-    unsigned int *tmp_pt = (unsigned int *) 0xC03FF000;
-    tmp_pt[pt_index] = 0;
-
-    page_table[1023] = 0;
-    tlb_flush(0xC03FF000);
+    // if page directory contains no page table entry, it should freed that address
+    if (pt_is_empty(pd_index)) {
+        PD_VIRT[pd_index] = 0;
+    }
+    
+    // refresh the unmapped address so the CPU drops the old translation
     tlb_flush(virt);
 }
 
@@ -109,27 +73,20 @@ unsigned int vmm_get_phys(unsigned int virt) {
     unsigned int pd_index = virt >> 22;
     unsigned int pt_index = (virt >> 12) & 0x3FF;
 
-    // if page directory entry is empty -> return
-    if (!(page_directory[pd_index] & PAGE_PRESENT)) return 0;
+    // if the page directory entry is empty -> not mapped, return 0
+    if (!(PD_VIRT[pd_index] & PAGE_PRESENT)) return 0;
 
-    // access page table by temp mapping
-    unsigned int pt = page_directory[pd_index] & ~0xFFF;
-    page_table[1023] = pt | PAGE_PRESENT | PAGE_RW;
-    tlb_flush(0xC03FF000);
+    // read the PTE via the recursive window; if not present -> not mapped
+    if (!(PT_VIRT(pd_index)[pt_index] & PAGE_PRESENT)) return 0;
 
-    // save the physical address for that PTE
-    unsigned int *tmp_pt = (unsigned int *) 0xC03FF000;
-    if (!(tmp_pt[pt_index] & PAGE_PRESENT)) {
-        page_table[1023] = 0;
-        tlb_flush(0xC03FF000);
-        return 0;
-    }
-    unsigned int phys_addr = tmp_pt[pt_index] & ~0xFFF;
-
-    // revert temp mapping
-    page_table[1023] = 0;
-    tlb_flush(0xC03FF000);
-
+    // mask off the low 12 flag bits and return the physical frame address
+    unsigned int phys_addr = PT_VIRT(pd_index)[pt_index] & ~0xFFF;
     return phys_addr;
+}
+
+static int pt_is_empty(unsigned int pd_index) {
+    for (int i = 0; i < 1024; i++)
+        if (PT_VIRT(pd_index)[i] & PAGE_PRESENT) return 0;  // found one -> not empty
+    return 1;  // got through all 1024 -> empty
 }
 
