@@ -21,5 +21,6 @@
 
 char *print_hex(unsigned int n);
 void kmemset(void *ptr, int value, unsigned int size);
+void *kmemcpy(void *dest, const void *src, unsigned int size);
 
 #endif

@@ -16,6 +16,7 @@ struct mmap_entry {
 extern unsigned int page_bitmap[1024];
 
 void pmm_init(unsigned int map_addr, unsigned int map_length);
+void pmm_reserve_region(unsigned int start_addr, unsigned int end_addr);
 unsigned int pmm_alloc();
 void pmm_free(unsigned int address);
 

@@ -23,3 +23,21 @@ void kmemset(void *ptr, int value, unsigned int size) {
         p[i] = (unsigned char)value;
     }
 }
+
+/**
+ * kmemcpy:
+ *   Copies size bytes from src to dest. The two regions must not overlap.
+ *
+ * @param dest      Destination buffer to copy into
+ * @param src       Source buffer to copy from
+ * @param size      Number of bytes to copy
+ * @return          dest (the destination pointer)
+ */
+void *kmemcpy(void *dest, const void *src, unsigned int size) {
+    unsigned char * d = (unsigned char *) dest;
+    unsigned const char * s = (unsigned const char *) src;
+    for (unsigned int i = 0 ; i < size ; i++) {
+        d[i] = s[i];
+    }
+    return d;
+}

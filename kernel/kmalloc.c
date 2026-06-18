@@ -2,7 +2,7 @@
 #include "pmm.h"
 #include "vmm.h"
 
-#define HEAP_START 0xC0400000
+#define HEAP_START 0xC0800000
 
 static struct block_header *heap_start = 0;
 static unsigned int heap_next = HEAP_START; // tracking the next address for the new page

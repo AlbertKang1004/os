@@ -42,9 +42,28 @@ void pmm_init(unsigned int map_addr, unsigned int map_length) {
     // mark kernel pages as used
     unsigned int phys_start = (unsigned int)(unsigned long) &kernel_physical_start;
     unsigned int phys_end   = (unsigned int)(unsigned long) &kernel_physical_end;
-    unsigned int kernel_start_page = phys_start / PAGE_SIZE;
-    unsigned int kernel_end_page = phys_end / PAGE_SIZE;
-    for (unsigned int i = kernel_start_page; i <= kernel_end_page; i++) {
+    pmm_reserve_region(phys_start, phys_end);
+}
+
+/**
+ * pmm_reserve_region:
+ *   Marks every page frame overlapping the physical range [start_addr, end_addr)
+ *   as used, so pmm_alloc will never hand them out. Used to protect regions the
+ *   PMM must not touch (kernel image, GRUB modules, etc).
+ *
+ * @param start_addr    Physical start address of the region to reserve
+ * @param end_addr      Physical end address of the region (exclusive)
+ *
+ * Build guide (model it on the kernel-reserve loop in pmm_init):
+ *   - convert start_addr -> first page index (start_addr / PAGE_SIZE)
+ *   - convert end_addr   -> last page index; mind the boundary so a region
+ *       ending mid-page still reserves that whole page
+ *   - loop over the page range, bitmap_set(i), guarding i < MAX_PAGES
+ */
+void pmm_reserve_region(unsigned int start_addr, unsigned int end_addr) {
+    unsigned int start_page = start_addr / PAGE_SIZE;
+    unsigned int end_page = end_addr / PAGE_SIZE;
+    for (unsigned int i = start_page ; i <= end_page && i < MAX_PAGES; i++) {
         bitmap_set(i);
     }
 }

@@ -12,9 +12,7 @@
 #include "utils.h"
 #include "vmm.h"
 
-extern unsigned int multiboot_mods_addr;
-extern unsigned int multiboot_mmap_addr;
-extern unsigned int multiboot_mmap_length;
+extern unsigned int multiboot_info_ptr;
 extern unsigned int kernel_virtual_start;
 extern unsigned int kernel_virtual_end;
 extern unsigned int kernel_physical_start;
@@ -123,6 +121,7 @@ void kmain() {
     // 2 	    0x10 	kernel data segment 0x00000000 - 0xFFFFFFFF 	RW 	    PL0
     // 3 	    0x18 	user code segment 	0x00000000 - 0xFFFFFFFF 	RX 	    PL3
     // 4 	    0x20 	user data segment 	0x00000000 - 0xFFFFFFFF 	RW 	    PL3
+
     gdt_set_entry(0, 0, 0,          0,    0);       // null
     gdt_set_entry(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);    // kernel code PL0
     gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF);    // kernel data PL0
@@ -154,14 +153,19 @@ void kmain() {
     outb(0x21, 0x01);
     __asm__("sti");
 
+    multiboot_info_t *mb = (multiboot_info_t *)(unsigned long)(multiboot_info_ptr + KERNEL_VIRTUAL_BASE);
     // Physical memory manager init
-    pmm_init(multiboot_mmap_addr + 0xC0000000, multiboot_mmap_length);
+    pmm_init(mb->mmap_addr + 0xC0000000, mb->mmap_length);
 
     // testing goes here...
     
     // Jump to user module
-    multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (multiboot_mods_addr + KERNEL_VIRTUAL_BASE);
-    call_module_t start_program = (call_module_t)(unsigned long) module->mod_start + KERNEL_VIRTUAL_BASE;
+    multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (mb->mods_addr + KERNEL_VIRTUAL_BASE);
+    for (unsigned int i = 0; i < mb->mods_count; i++) {
+        pmm_reserve_region(module[i].mod_start, module[i].mod_end);
+    }
+    
+    call_module_t start_program = (call_module_t)(unsigned long) (module->mod_start + KERNEL_VIRTUAL_BASE);
     start_program();
 }
 

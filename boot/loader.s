@@ -1,9 +1,7 @@
 ; EXPORT TO KMAIN.C
 global loader                       ; the entry symbol for ELF
 global page_directory
-global multiboot_mods_addr
-global multiboot_mmap_addr
-global multiboot_mmap_length
+global multiboot_info_ptr
 
 ; IMPORT FROM LINK.LD
 extern kmain                        ; the C kernel entry point
@@ -19,9 +17,7 @@ KERNEL_VIRTUAL_BASE equ 0xC0000000
 KERNEL_STACK_SIZE   equ 4096          ; size of stack in bytes
 
 section .bss
-multiboot_mods_addr:    resd 1
-multiboot_mmap_addr:    resd 1
-multiboot_mmap_length:  resd 1
+multiboot_info_ptr:  resd 1
 
 alignb 4096                          ; page directory must be 4KB aligned
 page_directory:
@@ -72,12 +68,7 @@ fill_pt:
     mov dword [eax + (1023*4)], edx ; [1023] itself (recursive mapping)
 
     ; save multiboot info before paging
-    mov esi, [edi + 24]                           ; mods_addr
-    mov [multiboot_mods_addr - KERNEL_VIRTUAL_BASE], esi
-    mov esi, [edi + 44]                           ; mmap_length
-    mov [multiboot_mmap_length - KERNEL_VIRTUAL_BASE], esi
-    mov esi, [edi + 48]                           ; mmap_addr
-    mov [multiboot_mmap_addr - KERNEL_VIRTUAL_BASE], esi
+    mov [multiboot_info_ptr - KERNEL_VIRTUAL_BASE], edi
 
     mov cr3, eax                    ; load page directory address into cr3
     mov ebx, cr0                    ; read current cr0

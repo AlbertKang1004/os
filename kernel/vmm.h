@@ -24,5 +24,4 @@ unsigned int vmm_get_phys(unsigned int virt);
 static inline void tlb_flush(unsigned int virt) {
     __asm__ volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
-static int pt_is_empty(unsigned int pd_index);
 #endif
