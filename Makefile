@@ -10,10 +10,15 @@ OBJECTS = boot/loader.o \
 		  kernel/process.o \
 		  kernel/tss.o \
 		  kernel/utils.o \
+		  kernel/usermode.o \
 		  kernel/vmm.o \
           drivers/pic.o \
           drivers/keyboard.o \
-          drivers/serial.o						
+          drivers/serial.o	
+
+USER_OBJECTS = iso/modules/start.o \
+			   iso/modules/main.o
+		  
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
          -nostartfiles -nodefaultlibs -Wall -Wextra -c \
@@ -27,7 +32,7 @@ all: generate program kernel.elf
 generate:
 	python3 generate_idt.py
 
-program:
+program: $(USER_OBJECTS)
 	nasm -f bin iso/modules/program.s -o iso/modules/program
 
 kernel.elf: $(OBJECTS)

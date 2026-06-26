@@ -2,6 +2,12 @@
 #include "pmm.h"
 #include "utils.h"
 
+static int pt_is_empty(unsigned int pd_index) {
+    for (int i = 0; i < 1024; i++)
+        if (PT_VIRT(pd_index)[i] & PAGE_PRESENT) return 0;  // found one -> not empty
+    return 1;  // got through all 1024 -> empty
+}
+
 /**
  * vmm_map_page:
  *   Maps a physical frame to a virtual address in the current page directory.
@@ -22,7 +28,7 @@ int vmm_map_page(unsigned int phys, unsigned int virt, unsigned int flags) {
         if (new_pt_phys == 0) return -1; // out of memory
 
         // install new table in directory (must be present before we touch its window)
-        PD_VIRT[pd_index] = new_pt_phys | PAGE_PRESENT | PAGE_RW;
+        PD_VIRT[pd_index] = new_pt_phys | PAGE_PRESENT | PAGE_RW | (flags & PAGE_USER);
         tlb_flush((unsigned int) PT_VIRT(pd_index)); // PDE changed -> refresh window
         kmemset(PT_VIRT(pd_index), 0, 4096); // zero the new table
     }
@@ -82,11 +88,5 @@ unsigned int vmm_get_phys(unsigned int virt) {
     // mask off the low 12 flag bits and return the physical frame address
     unsigned int phys_addr = PT_VIRT(pd_index)[pt_index] & ~0xFFF;
     return phys_addr;
-}
-
-static int pt_is_empty(unsigned int pd_index) {
-    for (int i = 0; i < 1024; i++)
-        if (PT_VIRT(pd_index)[i] & PAGE_PRESENT) return 0;  // found one -> not empty
-    return 1;  // got through all 1024 -> empty
 }
 

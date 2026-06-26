@@ -9,6 +9,8 @@
 #include "kmalloc.h"
 #include "multiboot.h"
 #include "pmm.h"
+#include "process.h"
+#include "tss.h"
 #include "utils.h"
 #include "vmm.h"
 
@@ -17,8 +19,10 @@ extern unsigned int kernel_virtual_start;
 extern unsigned int kernel_virtual_end;
 extern unsigned int kernel_physical_start;
 extern unsigned int kernel_physical_end;
+extern unsigned int kernel_stack_top;
 extern unsigned int gdt_size;
 extern struct gdt_entry gdt[];
+extern void enter_user_mode(unsigned int entry, unsigned int user_stack);
 
 typedef void (*call_module_t) (void);
 
@@ -93,6 +97,11 @@ void interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigne
         LOG_HEX("Interrupt", interrupt);
         LOG_HEX("Code", stack->error_code);
     }
+    unsigned int cr2;
+    __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+    LOG_HEX("cr2", cr2);
+    LOG_HEX("fault_eip", stack->eip);     // 폴트 낸 명령어 주소
+    LOG_HEX("err", stack->error_code);
 }
 
 /** create_idt_entry:
@@ -114,7 +123,6 @@ void create_idt_entry(unsigned int index, unsigned int handler) {
 
 void kmain() {
     // GDT setup
-
     // Index 	Offset 	Name 	            Address range 	            Type 	DPL
     // 0 	    0x00 	null descriptor 			
     // 1 	    0x08 	kernel code segment 0x00000000 - 0xFFFFFFFF 	RX 	    PL0
@@ -127,11 +135,15 @@ void kmain() {
     gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF);    // kernel data PL0
     gdt_set_entry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);    // user code PL3
     gdt_set_entry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);    // user data PL3
-    
+    gdt_set_entry(5, (unsigned int) &tss, sizeof(tss) - 1, 0x89, 0x00);    // TSS selector
+
     struct gdt_descriptor gdt_desc;
     gdt_desc.size = gdt_size - 1;
     gdt_desc.address = (unsigned int)(unsigned long) gdt;
     gdt_flush(&gdt_desc);
+
+    // TSS setup
+    tss_init((unsigned int) &kernel_stack_top);
 
     // Serial / framebuffer init
     fb_move_cursor(0);
@@ -158,15 +170,26 @@ void kmain() {
     pmm_init(mb->mmap_addr + 0xC0000000, mb->mmap_length);
 
     // testing goes here...
-    
+
     // Jump to user module
     multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (mb->mods_addr + KERNEL_VIRTUAL_BASE);
     for (unsigned int i = 0; i < mb->mods_count; i++) {
         pmm_reserve_region(module[i].mod_start, module[i].mod_end);
     }
     
-    call_module_t start_program = (call_module_t)(unsigned long) (module->mod_start + KERNEL_VIRTUAL_BASE);
-    start_program();
+    unsigned int phys_end = (unsigned int)(unsigned long) &kernel_physical_end;
+
+    struct process * proc = process_create(module->mod_start, module->mod_end - module->mod_start);
+    unsigned int entry  = proc->code_addr;
+    unsigned int ustack = proc->stack_addr;
+    unsigned int pd     = proc->page_directory;
+    __asm__ volatile("mov %0, %%cr3" :  : "r"(pd) : "memory");
+    enter_user_mode(entry, ustack);
+    
+    // call_module_t start_program = (call_module_t)(unsigned long) (module->mod_start + KERNEL_VIRTUAL_BASE);
+    // start_program();
+
+   
 }
 
 /* DEBUGGING PMM

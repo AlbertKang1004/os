@@ -1,6 +1,6 @@
 #include "gdt.h"
 
-struct gdt_entry gdt[5] __attribute__((aligned(8)));
+struct gdt_entry gdt[6] __attribute__((aligned(8)));
 unsigned int gdt_size = sizeof(gdt);
 
 /**

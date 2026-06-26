@@ -2,6 +2,7 @@
 global loader                       ; the entry symbol for ELF
 global page_directory
 global multiboot_info_ptr
+global kernel_stack_top
 
 ; IMPORT FROM LINK.LD
 extern kmain                        ; the C kernel entry point
@@ -30,6 +31,7 @@ page_table:
 alignb 4
 kernel_stack:                       ; label points to beginning of stack memory
     resb KERNEL_STACK_SIZE          ; reserve stack for the kernel
+kernel_stack_top:
 
 section .text
     dd MAGIC_NUMBER                 ; write the magic number
@@ -81,7 +83,7 @@ fill_pt:
 higher_half:
     mov dword [page_directory - 0xC0000000], 0x0
     invlpg [0]
-    mov esp, kernel_stack + KERNEL_STACK_SIZE   ; set up the stack
+    mov esp, kernel_stack + KERNEL_STACK_SIZE   ; set up the stack 
     call kmain                      ; call the C kernel
 .loop:
     jmp .loop                       ; loop forever if kmain returns
