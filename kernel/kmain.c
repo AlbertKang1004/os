@@ -10,6 +10,7 @@
 #include "multiboot.h"
 #include "pmm.h"
 #include "process.h"
+#include "syscall.h"
 #include "tss.h"
 #include "utils.h"
 #include "vmm.h"
@@ -25,7 +26,6 @@ extern struct gdt_entry gdt[];
 extern void enter_user_mode(unsigned int entry, unsigned int user_stack);
 
 typedef void (*call_module_t) (void);
-
 struct idt_entry idt[256];
 
 char *fb = (char *) 0xC00B8000;
@@ -86,22 +86,23 @@ int fb_write(char* text, unsigned char bg, unsigned char fg, unsigned int offset
  *  @param interrupt    The interrupt number
  */
 void interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigned int interrupt) {
-    (void) cpu;
     if (interrupt == 0x21) {
         // Keyboard interrupt
         unsigned char scan_code = read_scan_code();
         LOG_HEX("Key", scan_code);
         pic_acknowledge(interrupt);
+    } else if (interrupt == 0x80) {
+        syscall_dispatch(cpu);
     } else {
         // Other interrupts
         LOG_HEX("Interrupt", interrupt);
         LOG_HEX("Code", stack->error_code);
+        unsigned int cr2;
+        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+        LOG_HEX("cr2", cr2);
+        LOG_HEX("fault_eip", stack->eip);     // 폴트 낸 명령어 주소
+        LOG_HEX("err", stack->error_code);
     }
-    unsigned int cr2;
-    __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
-    LOG_HEX("cr2", cr2);
-    LOG_HEX("fault_eip", stack->eip);     // 폴트 낸 명령어 주소
-    LOG_HEX("err", stack->error_code);
 }
 
 /** create_idt_entry:
@@ -112,12 +113,11 @@ void interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigne
  */
 void create_idt_entry(unsigned int index, unsigned int handler) {
 	struct idt_entry idt_e;
-	idt_e.offset_high = (handler >> 16) & 0xFFFF;
-	idt_e.offset_low = handler & 0xFFFF;
-	idt_e.reserved = 0;
-	idt_e.segment = 0x0008;
-	idt_e.type_attr = 0x8E;
-	// 1110 1000
+    idt_e.offset_high = (handler >> 16) & 0xFFFF;
+    idt_e.offset_low = handler & 0xFFFF;
+    idt_e.reserved = 0;
+    idt_e.segment = 0x0008; // kernel code segment
+    idt_e.type_attr = (index == 0x80) ? 0xEE : 0x8E; 
 	idt[index] = idt_e;
 }
 

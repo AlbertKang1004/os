@@ -6,9 +6,8 @@
 
         .text ALIGN(4):
         {
-            start.o(.text)     /* include the .text section of start.o */
             *(.text*)           /* include all other .text sections */
-        }*
+        }
 
         .data ALIGN(4):
         {

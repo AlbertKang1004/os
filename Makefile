@@ -8,6 +8,7 @@ OBJECTS = boot/loader.o \
 		  kernel/multiboot.o \
 		  kernel/pmm.o \
 		  kernel/process.o \
+		  kernel/syscall.o \
 		  kernel/tss.o \
 		  kernel/utils.o \
 		  kernel/usermode.o \
@@ -17,12 +18,13 @@ OBJECTS = boot/loader.o \
           drivers/serial.o	
 
 USER_OBJECTS = iso/modules/start.o \
-			   iso/modules/main.o
+			   iso/modules/main.o \
+			   iso/modules/ulib.o 
 		  
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
          -nostartfiles -nodefaultlibs -Wall -Wextra -c \
-		 -Wno-int-to-pointer-cast -DDEBUG #-Werror 
+		 -Wno-int-to-pointer-cast -DDEBUG -fno-pie -fno-pic -Iinclude #-Werror 
 LDFLAGS = -T link.ld -melf_i386
 AS = nasm
 ASFLAGS = -f elf32
@@ -33,7 +35,7 @@ generate:
 	python3 generate_idt.py
 
 program: $(USER_OBJECTS)
-	nasm -f bin iso/modules/program.s -o iso/modules/program
+	ld -T user.ld -melf_i386 $(USER_OBJECTS) -o iso/modules/program
 
 kernel.elf: $(OBJECTS)
 	ld $(LDFLAGS) $(OBJECTS) -o kernel.elf
@@ -61,4 +63,4 @@ run: os.iso
 	$(AS) $(ASFLAGS) -i$(dir $<) $< -o $@
 
 clean:
-	rm -rf *.o kernel.elf os.iso iso/modules/program boot/*.o lib/*.o kernel/*.o drivers/*.o
+	rm -rf *.o kernel.elf os.iso iso/modules/program iso/modules/*.o boot/*.o lib/*.o kernel/*.o drivers/*.o

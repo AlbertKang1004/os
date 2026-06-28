@@ -1,6 +1,7 @@
+#include "ulib.h"
+
 int main(void) {
-    volatile unsigned int x = 0xCAFEBABE;
-    (void) x;
-    while (1) {}
-    return 0;
+    char* text = "hello!\n";
+    write(0, text, 7);
+    while (1){}
 }
