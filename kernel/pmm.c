@@ -1,4 +1,5 @@
 #include "pmm.h"
+#include "debug.h"
 
 unsigned int page_bitmap[1024];
 
@@ -80,6 +81,7 @@ unsigned int pmm_alloc() {
             return i * PAGE_SIZE;
         }
     }
+    
     return 0;  // fail
 }
 

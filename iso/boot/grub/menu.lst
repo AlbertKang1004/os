@@ -3,4 +3,5 @@ timeout=0
 
 title os
 kernel /boot/kernel.elf
-module /modules/program
+module /modules/prog_a
+module /modules/prog_b

@@ -8,18 +8,22 @@ OBJECTS = boot/loader.o \
 		  kernel/multiboot.o \
 		  kernel/pmm.o \
 		  kernel/process.o \
+		  kernel/scheduler.o \
 		  kernel/syscall.o \
 		  kernel/tss.o \
 		  kernel/utils.o \
 		  kernel/usermode.o \
 		  kernel/vmm.o \
           drivers/pic.o \
+		  drivers/pit.o \
           drivers/keyboard.o \
           drivers/serial.o	
 
-USER_OBJECTS = iso/modules/start.o \
-			   iso/modules/main.o \
-			   iso/modules/ulib.o 
+SHARED_OBJS = iso/modules/start.o \
+			  iso/modules/ulib.o
+
+USER_PROGS = iso/modules/prog_a \
+			 iso/modules/prog_b
 		  
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
@@ -29,18 +33,18 @@ LDFLAGS = -T link.ld -melf_i386
 AS = nasm
 ASFLAGS = -f elf32
 
-all: generate program kernel.elf
+all: generate $(USER_PROGS) kernel.elf
 
 generate:
 	python3 generate_idt.py
 
-program: $(USER_OBJECTS)
-	ld -T user.ld -melf_i386 $(USER_OBJECTS) -o iso/modules/program
+$(USER_PROGS): iso/modules/%: iso/modules/%.o $(SHARED_OBJS)
+	ld -T user.ld -melf_i386 iso/modules/start.o $< iso/modules/ulib.o -o $@
 
 kernel.elf: $(OBJECTS)
 	ld $(LDFLAGS) $(OBJECTS) -o kernel.elf
 
-os.iso: kernel.elf program
+os.iso: kernel.elf $(USER_PROGS)
 	cp kernel.elf iso/boot/kernel.elf
 	genisoimage -R                              \
 	            -b boot/grub/stage2_eltorito    \
@@ -63,4 +67,4 @@ run: os.iso
 	$(AS) $(ASFLAGS) -i$(dir $<) $< -o $@
 
 clean:
-	rm -rf *.o kernel.elf os.iso iso/modules/program iso/modules/*.o boot/*.o lib/*.o kernel/*.o drivers/*.o
+	rm -rf *.o kernel.elf os.iso $(USER_PROGS) iso/modules/*.o boot/*.o lib/*.o kernel/*.o drivers/*.o

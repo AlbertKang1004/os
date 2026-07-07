@@ -3,6 +3,7 @@
 #include "interrupt.h"
 #include "interrupt_handlers.h"
 #include "../drivers/pic.h"
+#include "../drivers/pit.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/serial.h"
 #include "debug.h"
@@ -10,6 +11,7 @@
 #include "multiboot.h"
 #include "pmm.h"
 #include "process.h"
+#include "scheduler.h"
 #include "syscall.h"
 #include "tss.h"
 #include "utils.h"
@@ -29,6 +31,7 @@ typedef void (*call_module_t) (void);
 struct idt_entry idt[256];
 
 char *fb = (char *) 0xC00B8000;
+volatile unsigned int ticks = 0;
 
 /* =============== FRAMEBUFFER ================ */
 
@@ -91,8 +94,16 @@ void interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigne
         unsigned char scan_code = read_scan_code();
         LOG_HEX("Key", scan_code);
         pic_acknowledge(interrupt);
-    } else if (interrupt == 0x80) {
+    } else if (interrupt == 0x80) { // system calls
         syscall_dispatch(cpu);
+    } else if (interrupt == 0x20) { // timer interrupt
+        ticks++;
+        if (ticks % 100 == 0) { // wait 1 second
+            LOG_HEX("tick", ticks);
+        }
+        pic_acknowledge(interrupt);
+        if ((stack->cs & 0x3) == 3) 
+            schedule(cpu, stack);
     } else {
         // Other interrupts
         LOG_HEX("Interrupt", interrupt);
@@ -100,7 +111,7 @@ void interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigne
         unsigned int cr2;
         __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
         LOG_HEX("cr2", cr2);
-        LOG_HEX("fault_eip", stack->eip);     // 폴트 낸 명령어 주소
+        LOG_HEX("fault_eip", stack->eip);     // code that caused fault
         LOG_HEX("err", stack->error_code);
     }
 }
@@ -160,14 +171,18 @@ void kmain() {
     idt_desc.address = (unsigned int)(unsigned long) idt;
     load_idt(&idt_desc);
 
-    // PIC setup and enable interrupts
+    // PIC setup and enable interrupts + PIT setup
     pic_remap(0x20, 0x28);
-    outb(0x21, 0x01);
+    pit_init(100);
+    outb(0x21, 0x00);
     __asm__("sti");
 
     multiboot_info_t *mb = (multiboot_info_t *)(unsigned long)(multiboot_info_ptr + KERNEL_VIRTUAL_BASE);
     // Physical memory manager init
     pmm_init(mb->mmap_addr + 0xC0000000, mb->mmap_length);
+    pmm_reserve_region(mb->mods_addr, mb->mods_addr + (mb->mods_count * sizeof(multiboot_module_t)));
+    pmm_reserve_region(multiboot_info_ptr, multiboot_info_ptr + sizeof(multiboot_info_t));
+    pmm_reserve_region(mb->mmap_addr, mb->mmap_addr + mb->mmap_length);
 
     // testing goes here...
 
@@ -179,17 +194,19 @@ void kmain() {
     
     unsigned int phys_end = (unsigned int)(unsigned long) &kernel_physical_end;
 
-    struct process * proc = process_create(module->mod_start, module->mod_end - module->mod_start);
+    LOG_HEX("m0_first", *(unsigned int *)(0xC0000000 + module[0].mod_start));
+    LOG_HEX("m1_first", *(unsigned int *)(0xC0000000 + module[1].mod_start));
+    struct process * proc = process_create(module[0].mod_start, module[0].mod_end - module[0].mod_start);
+    struct process * proc2 = process_create(module[1].mod_start, module[1].mod_end - module[1].mod_start);   
+    scheduler_add(proc);
+    scheduler_add(proc2);
+
     unsigned int entry  = proc->code_addr;
     unsigned int ustack = proc->stack_addr;
     unsigned int pd     = proc->page_directory;
     __asm__ volatile("mov %0, %%cr3" :  : "r"(pd) : "memory");
-    enter_user_mode(entry, ustack);
-    
-    // call_module_t start_program = (call_module_t)(unsigned long) (module->mod_start + KERNEL_VIRTUAL_BASE);
-    // start_program();
 
-   
+    enter_user_mode(entry, ustack);
 }
 
 /* DEBUGGING PMM

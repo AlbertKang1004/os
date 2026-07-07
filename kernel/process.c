@@ -1,8 +1,10 @@
+#include "interrupt.h"
 #include "kmalloc.h"
 #include "process.h"
 #include "pmm.h"
 #include "vmm.h"
 #include "utils.h"
+#include "debug.h"
 
 extern unsigned int page_directory[];
 
@@ -37,6 +39,12 @@ struct process *process_create(unsigned int binary_start, unsigned int binary_si
     kmemset(new_pd_virt, 0, 4096);
 
     for (unsigned i = 768; i < 1023 ; i++) {
+        if (page_directory[i] == 0) { // no page table yet
+            unsigned int frame = pmm_alloc();
+            page_directory[i] = frame | PAGE_PRESENT | PAGE_RW;
+            tlb_flush((unsigned int) PT_VIRT(i));
+            kmemset((void *)PT_VIRT(i), 0, 4096);
+        }
        new_pd_virt[i] = page_directory[i];
     }
     new_pd_virt[1023] = new_pd_phys | PAGE_PRESENT | PAGE_RW;
@@ -56,8 +64,7 @@ struct process *process_create(unsigned int binary_start, unsigned int binary_si
     vmm_map_page(stack_addr, 0xBFFFF000, PAGE_USER | PAGE_RW | PAGE_PRESENT);
 
     // copy binary 
-    kmemcpy((void *) 0x00000000, (void *)(0xC0000000 + binary_start), binary_size);
-
+    kmemcpy((void *) 0x00000000, (void *)(0xC0000000 + binary_start), binary_size);   
     // revert back cr3
     __asm__ volatile("mov %0, %%cr3" : : "r"(saved_cr3) : "memory");
     struct process * proc = kmalloc(sizeof(struct process));
@@ -65,5 +72,28 @@ struct process *process_create(unsigned int binary_start, unsigned int binary_si
     proc -> page_directory = new_pd_phys;
     proc -> code_addr = 0x00000000;
     proc -> stack_addr = 0xC0000000; // starts from top
+    proc -> next = 0; // NULL
+
+    // save default state of the process
+    struct stack_state stack;
+    stack.error_code = 0;
+    stack.eip = proc->code_addr;
+    stack.cs = 0x1B;
+    stack.eflags = 0x202;
+    stack.user_esp = proc->stack_addr;
+    stack.user_ss = 0x23;
+    proc->stack = stack;
+    
+    struct cpu_state cpu;
+    cpu.edi = 0;
+    cpu.esi = 0;
+    cpu.ebp = 0;
+    cpu.esp = 0;
+    cpu.ebx = 0;
+    cpu.edx = 0;
+    cpu.ecx = 0;
+    cpu.eax = 0;
+    proc->cpu = cpu;
+
     return proc;
 }

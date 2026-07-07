@@ -2,5 +2,6 @@
 *.out
 *.iso
 *.elf
-iso/modules/program
+iso/modules/prog_*
+!iso/modules/prog_*.c
 com1.out

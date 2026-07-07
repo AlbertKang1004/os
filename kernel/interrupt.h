@@ -17,6 +17,8 @@ struct stack_state {
     unsigned int eip;
     unsigned int cs;
     unsigned int eflags;
+    unsigned int user_esp;
+    unsigned int user_ss;
 } __attribute__((packed));
 
 struct idt_entry {
