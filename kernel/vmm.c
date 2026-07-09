@@ -1,3 +1,4 @@
+#include "cpu.h"
 #include "vmm.h"
 #include "pmm.h"
 #include "utils.h"

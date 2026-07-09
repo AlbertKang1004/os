@@ -1,4 +1,5 @@
 #include "../lib/io.h"
+#include "exceptions.h"
 #include "gdt.h"
 #include "interrupt.h"
 #include "interrupt_handlers.h"
@@ -6,7 +7,9 @@
 #include "../drivers/pit.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/serial.h"
+#include "cpu.h"
 #include "debug.h"
+#include "interrupt.h"
 #include "kmalloc.h"
 #include "multiboot.h"
 #include "pmm.h"
@@ -31,7 +34,6 @@ typedef void (*call_module_t) (void);
 struct idt_entry idt[256];
 
 char *fb = (char *) 0xC00B8000;
-volatile unsigned int ticks = 0;
 
 /* =============== FRAMEBUFFER ================ */
 
@@ -47,7 +49,6 @@ void fb_write_cell(unsigned int i, char c, unsigned char bg, unsigned char fg) {
 	fb[i] = c;
 	fb[i + 1] = ((bg & 0x0F) << 4 | (fg & 0x0F));
 }
-
 
 /** fb_move_cursor:
  *  Moves the cursor of the framebuffer to the given position
@@ -80,41 +81,6 @@ int fb_write(char* text, unsigned char bg, unsigned char fg, unsigned int offset
 }
 
 /* ================ INTERRUPT ================= */
-
-/** interrupt_handler:
- *  Handles the interrupt by delegating to the appropriate handler
- * 
- *  @param cpu          The CPU register state at the time of the interrupt
- *  @param stack        The stack state pushed by the CPU when the interrupt occurred
- *  @param interrupt    The interrupt number
- */
-void interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigned int interrupt) {
-    if (interrupt == 0x21) {
-        // Keyboard interrupt
-        unsigned char scan_code = read_scan_code();
-        LOG_HEX("Key", scan_code);
-        pic_acknowledge(interrupt);
-    } else if (interrupt == 0x80) { // system calls
-        syscall_dispatch(cpu);
-    } else if (interrupt == 0x20) { // timer interrupt
-        ticks++;
-        if (ticks % 100 == 0) { // wait 1 second
-            LOG_HEX("tick", ticks);
-        }
-        pic_acknowledge(interrupt);
-        if ((stack->cs & 0x3) == 3) 
-            schedule(cpu, stack);
-    } else {
-        // Other interrupts
-        LOG_HEX("Interrupt", interrupt);
-        LOG_HEX("Code", stack->error_code);
-        unsigned int cr2;
-        __asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
-        LOG_HEX("cr2", cr2);
-        LOG_HEX("fault_eip", stack->eip);     // code that caused fault
-        LOG_HEX("err", stack->error_code);
-    }
-}
 
 /** create_idt_entry:
  *  Creates an entry in the IDT for the given interrupt handler
@@ -171,6 +137,10 @@ void kmain() {
     idt_desc.address = (unsigned int)(unsigned long) idt;
     load_idt(&idt_desc);
 
+    keyboard_init();
+    syscall_init();
+    page_fault_init();
+
     // PIC setup and enable interrupts + PIT setup
     pic_remap(0x20, 0x28);
     pit_init(100);
@@ -194,8 +164,6 @@ void kmain() {
     
     unsigned int phys_end = (unsigned int)(unsigned long) &kernel_physical_end;
 
-    LOG_HEX("m0_first", *(unsigned int *)(0xC0000000 + module[0].mod_start));
-    LOG_HEX("m1_first", *(unsigned int *)(0xC0000000 + module[1].mod_start));
     struct process * proc = process_create(module[0].mod_start, module[0].mod_end - module[0].mod_start);
     struct process * proc2 = process_create(module[1].mod_start, module[1].mod_end - module[1].mod_start);   
     scheduler_add(proc);
@@ -204,7 +172,7 @@ void kmain() {
     unsigned int entry  = proc->code_addr;
     unsigned int ustack = proc->stack_addr;
     unsigned int pd     = proc->page_directory;
-    __asm__ volatile("mov %0, %%cr3" :  : "r"(pd) : "memory");
+    write_cr3(pd);
 
     enter_user_mode(entry, ustack);
 }

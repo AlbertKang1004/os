@@ -12,6 +12,6 @@ int sys_write(unsigned int ebx, unsigned int ecx, unsigned int edx);
 int sys_open(unsigned int ebx, unsigned int ecx, unsigned int edx);
 int sys_close(unsigned int ebx, unsigned int ecx, unsigned int edx);
 int sys_exit(unsigned int ebx, unsigned int ecx, unsigned int edx);
-void syscall_dispatch(struct cpu_state * cpu);
+void syscall_init(void);
 
 #endif

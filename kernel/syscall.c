@@ -43,17 +43,24 @@ int sys_close(unsigned int ebx, unsigned int ecx, unsigned int edx) {
 }
 
 int sys_exit(unsigned int ebx, unsigned int ecx, unsigned int edx) {
-    int error_code = ebx;
+    int status = ebx;
     (void) ecx;
     (void) edx;
     return 0;
 }
 
-void syscall_dispatch(struct cpu_state * cpu) {
+static void syscall_dispatch(struct cpu_state * cpu, struct stack_state * stack, unsigned int interrupt) {
+    (void) stack;
+    (void) interrupt;
+
     unsigned int syscall_num = cpu->eax;
     if (syscall_num >= SYSCALL_TABLE_SIZE || syscall_table[syscall_num] == 0) { 
         cpu->eax = -1;
     } else {
         cpu->eax = syscall_table[syscall_num](cpu->ebx, cpu->ecx, cpu->edx);
     }
+}
+
+void syscall_init() {
+    register_interrupt_handler(0x80, syscall_dispatch);
 }

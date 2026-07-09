@@ -1,12 +1,9 @@
+#include "cpu.h"
 #include "scheduler.h"
 #include "process.h"
 
 static struct process *current = 0;
 static struct process *tail = 0;
-
-static inline void write_cr3(unsigned int page_dir_phys_addr) {
-    asm volatile("mov %0, %%cr3" :: "r"(page_dir_phys_addr) : "memory");
-}
 
 /**
  * scheduler_add:

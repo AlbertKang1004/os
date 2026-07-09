@@ -1,8 +1,10 @@
 OBJECTS = boot/loader.o \
           lib/io.o \
           kernel/kmain.o \
+		  kernel/exceptions.o \
           kernel/gdt.o \
           kernel/interrupt.o \
+		  kernel/interrupt_asm.o \
           kernel/interrupt_handlers.o \
 		  kernel/kmalloc.o \
 		  kernel/multiboot.o \

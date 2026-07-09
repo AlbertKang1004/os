@@ -18,6 +18,13 @@ Targets x86 (32-bit protected mode) with a higher-half kernel at 0xC0100000.
 | PMM | Physical memory manager (bitmap) | 2026-05-27 |
 | VMM | Virtual memory manager, page mapping | 2026-06-07 |
 | Heap | kmalloc/kfree, first-fit allocator | 2026-06-09 |
+| Processes | process_create: per-process page directory, code/stack mapping | 2026-06-18 |
+| User Mode | Ring 3 execution, TSS, user segments | 2026-06-26 |
+| Syscalls | int 0x80 gate, dispatch table, user-side syscall lib | 2026-06-28 |
+| PIT | Programmable Interval Timer, 100Hz tick | 2026-07-01 |
+| Scheduler | Preemptive round-robin across user processes | 2026-07-07 |
+| Interrupt Dispatch | Handler registration table, drivers self-register | 2026-07-09 |
+| Exceptions | Page fault handler (cr2/eip dump, halt) | 2026-07-09 |
 
 ---
 

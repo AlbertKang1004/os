@@ -9,3 +9,9 @@ int syscall3(int num, int a, int b, int c) {
 int write(int fd, const void *buf, unsigned n) {
     return syscall3(SYS_WRITE, fd, (int)buf, n);
 }
+
+__attribute__((noreturn)) 
+void exit(int status) {
+    syscall3(SYS_EXIT, status, 0, 0);
+    for (;;); // cannot go through
+}

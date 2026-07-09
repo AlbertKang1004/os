@@ -5,6 +5,7 @@
 #include "vmm.h"
 #include "utils.h"
 #include "debug.h"
+#include "cpu.h"
 
 extern unsigned int page_directory[];
 

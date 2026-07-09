@@ -1,5 +1,21 @@
 #include "pit.h"
 #include "../lib/io.h"
+#include "../kernel/interrupt.h"
+#include "../kernel/debug.h"
+#include "pic.h"
+#include "../kernel/scheduler.h"
+
+volatile unsigned int ticks = 0;
+
+static void pit_interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigned int interrupt) {
+     ticks++;
+    if (ticks % 100 == 0) { // wait 1 second
+        LOG_HEX("tick", ticks);
+    }
+    pic_acknowledge(interrupt);
+    if ((stack->cs & 0x3) == 3) 
+        schedule(cpu, stack);
+}
 
 /**
  * Configure PIT channel 0 to generate IRQ0 at a given frequency.
@@ -12,5 +28,7 @@ void pit_init(unsigned int frequency) {
     outb(PIT_COMMAND, 0x36); // 00110110
     outb(PIT_CHANNEL0, count&0xFF);
     outb(PIT_CHANNEL0, (count&0xFF00)>>8);
+    register_interrupt_handler(0x20, pit_interrupt_handler);
     return;
 }
+
