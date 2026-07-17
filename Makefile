@@ -25,7 +25,8 @@ SHARED_OBJS = iso/modules/start.o \
 			  iso/modules/ulib.o
 
 USER_PROGS = iso/modules/prog_a \
-			 iso/modules/prog_b
+			 iso/modules/prog_b \
+			 iso/modules/idle
 		  
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \

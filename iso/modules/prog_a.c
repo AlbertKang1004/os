@@ -2,7 +2,8 @@
 
 int main(void) {
     char* text = "hello!\n";
-    write(0, text, 7);
-    // *(volatile int *)0xDEADBEEF = 1; testing error
-    while (1){}
+    write(1, text, 7);
+    sleep(1); // 1 seconds sleep
+    write(1, text, 7);
+    exit(0);
 }

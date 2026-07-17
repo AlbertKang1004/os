@@ -143,7 +143,7 @@ void kmain() {
 
     // PIC setup and enable interrupts + PIT setup
     pic_remap(0x20, 0x28);
-    pit_init(100);
+    pit_init(1000);
     outb(0x21, 0x00);
     __asm__("sti");
 
@@ -166,8 +166,10 @@ void kmain() {
 
     struct process * proc = process_create(module[0].mod_start, module[0].mod_end - module[0].mod_start);
     struct process * proc2 = process_create(module[1].mod_start, module[1].mod_end - module[1].mod_start);   
+    struct process * idle = process_create(module[2].mod_start, module[2].mod_end - module[2].mod_start);   
     scheduler_add(proc);
     scheduler_add(proc2);
+    scheduler_set_idle(idle); // idle process
 
     unsigned int entry  = proc->code_addr;
     unsigned int ustack = proc->stack_addr;

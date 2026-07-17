@@ -3,3 +3,4 @@
 #define SYS_OPEN 2
 #define SYS_CLOSE 3
 #define SYS_EXIT 4
+#define SYS_SLEEP 5

@@ -5,3 +5,4 @@ title os
 kernel /boot/kernel.elf
 module /modules/prog_a
 module /modules/prog_b
+module /modules/idle

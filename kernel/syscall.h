@@ -5,13 +5,14 @@
 
 #include "interrupt.h"
 
-typedef int (*syscall_handler_t) (unsigned int, unsigned int, unsigned int);
+typedef int (*syscall_handler_t) (struct cpu_state *, struct stack_state *);
 
-int sys_read(unsigned int ebx, unsigned int ecx, unsigned int edx);
-int sys_write(unsigned int ebx, unsigned int ecx, unsigned int edx);
-int sys_open(unsigned int ebx, unsigned int ecx, unsigned int edx);
-int sys_close(unsigned int ebx, unsigned int ecx, unsigned int edx);
-int sys_exit(unsigned int ebx, unsigned int ecx, unsigned int edx);
+int sys_read(struct cpu_state * cpu, struct stack_state * stack);
+int sys_write(struct cpu_state * cpu, struct stack_state * stack);
+int sys_open(struct cpu_state * cpu, struct stack_state * stack);
+int sys_close(struct cpu_state * cpu, struct stack_state * stack);
+int sys_exit(struct cpu_state * cpu, struct stack_state * stack);
+int sys_nanosleep(struct cpu_state * cpu, struct stack_state * stack);
 void syscall_init(void);
 
 #endif

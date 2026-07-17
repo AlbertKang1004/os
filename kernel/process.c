@@ -73,6 +73,8 @@ struct process *process_create(unsigned int binary_start, unsigned int binary_si
     proc -> page_directory = new_pd_phys;
     proc -> code_addr = 0x00000000;
     proc -> stack_addr = 0xC0000000; // starts from top
+    proc -> wake_tick = 0;
+    proc -> state = PROCESS_READY;
     proc -> next = 0; // NULL
 
     // save default state of the process
