@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "gdt.h"
 
 /** print_hex:
  *  Converts an unsigned integer to a hexadecimal string
@@ -40,4 +41,54 @@ void *kmemcpy(void *dest, const void *src, unsigned int size) {
         d[i] = s[i];
     }
     return d;
+}
+
+/**
+ * kstrcmp:
+ *   Compares two null-terminated strings lexicographically.
+ *
+ * @param s1    First null-terminated string
+ * @param s2    Second null-terminated string
+ * @return      0 if the strings are equal;
+ *              a negative value if s1 is less than s2;
+ *              a positive value if s1 is greater than s2
+ */
+int kstrcmp(const char *s1, const char *s2) {
+    while (*s1 != 0 && *s2 != 0) {
+        if (*s1 != *s2) { // two strings are different
+            return (int) *s1 - *s2;
+        }   
+        s1++;
+        s2++;
+    }
+    if (*s1 == *s2) {
+        return 0;
+    }
+    else {
+        return (int) *s1 - *s2;
+    }    
+}
+
+int kstrncmp(const char *s1, const char *s2, unsigned int n) {
+    while (*s1 != 0 && *s2 != 0 && n > 0) {
+        if (*s1 != *s2) { // two strings are different
+            return (int) *s1 - *s2;
+        }   
+        s1++;
+        s2++;
+        n--;
+    }
+    if (n > 0) {
+        return (int) *s1 - *s2;
+    } else {
+        return 0;
+    }
+}
+
+int kstrlen(const char *s) {
+    int count = 0;
+    while (*s != 0) {
+        s++, count++;
+    }
+    return count;
 }

@@ -10,9 +10,14 @@
         serial_write(SERIAL_COM1_BASE, label ": "); \
         serial_write(SERIAL_COM1_BASE, print_hex(val)); \
         serial_write(SERIAL_COM1_BASE, "\n")
+    #define LOG_STR(label, val) \
+        serial_write(SERIAL_COM1_BASE, label ": "); \
+        serial_write(SERIAL_COM1_BASE, val); \
+        serial_write(SERIAL_COM1_BASE, "\n")
 #else
     #define LOG(msg)
     #define LOG_HEX(label, val)
+    #define LOG_STR(label, val)
 #endif
 
 #endif

@@ -3,6 +3,7 @@ OBJECTS = boot/loader.o \
           kernel/kmain.o \
 		  kernel/exceptions.o \
           kernel/gdt.o \
+		  kernel/initrd.o \
           kernel/interrupt.o \
 		  kernel/interrupt_asm.o \
           kernel/interrupt_handlers.o \
@@ -30,13 +31,13 @@ USER_PROGS = iso/modules/prog_a \
 		  
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
-         -nostartfiles -nodefaultlibs -Wall -Wextra -c \
+         -nostartfiles -nodefaultlibs -Wall -Wextra -c -g \
 		 -Wno-int-to-pointer-cast -DDEBUG -fno-pie -fno-pic -Iinclude #-Werror 
 LDFLAGS = -T link.ld -melf_i386
 AS = nasm
 ASFLAGS = -f elf32
 
-all: generate $(USER_PROGS) kernel.elf
+all: generate $(USER_PROGS) kernel.elf iso/modules/initrd.tar
 
 generate:
 	python3 generate_idt.py
@@ -44,10 +45,13 @@ generate:
 $(USER_PROGS): iso/modules/%: iso/modules/%.o $(SHARED_OBJS)
 	ld -T user.ld -melf_i386 iso/modules/start.o $< iso/modules/ulib.o -o $@
 
+iso/modules/initrd.tar: $(USER_PROGS)
+	tar --format=ustar -cf $@ -C iso/modules $(notdir $(USER_PROGS))
+
 kernel.elf: $(OBJECTS)
 	ld $(LDFLAGS) $(OBJECTS) -o kernel.elf
 
-os.iso: kernel.elf $(USER_PROGS)
+os.iso: kernel.elf $(USER_PROGS) iso/modules/initrd.tar
 	cp kernel.elf iso/boot/kernel.elf
 	genisoimage -R                              \
 	            -b boot/grub/stage2_eltorito    \
@@ -70,4 +74,4 @@ run: os.iso
 	$(AS) $(ASFLAGS) -i$(dir $<) $< -o $@
 
 clean:
-	rm -rf *.o kernel.elf os.iso $(USER_PROGS) iso/modules/*.o boot/*.o lib/*.o kernel/*.o drivers/*.o
+	rm -rf *.o kernel.elf os.iso $(USER_PROGS) iso/modules/*.o boot/*.o lib/*.o kernel/*.o drivers/*.o iso/modules/*.tar

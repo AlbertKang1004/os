@@ -2,6 +2,7 @@
 *.out
 *.iso
 *.elf
+*.tar
 iso/modules/prog_*
 !iso/modules/prog_*.c
 com1.out

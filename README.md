@@ -21,12 +21,13 @@ Targets x86 (32-bit protected mode) with a higher-half kernel at 0xC0100000.
 | Processes | process_create: per-process page directory, code/stack mapping | 2026-06-18 |
 | User Mode | Ring 3 execution, TSS, user segments | 2026-06-26 |
 | Syscalls | int 0x80 gate, dispatch table, user-side syscall lib | 2026-06-28 |
-| PIT | Programmable Interval Timer, 100Hz tick | 2026-07-01 |
+| PIT | Programmable Interval Timer, 1000Hz tick (1ms), 100-tick quantum | 2026-07-01 |
 | Scheduler | Preemptive round-robin across user processes | 2026-07-07 |
 | Interrupt Dispatch | Handler registration table, drivers self-register | 2026-07-09 |
 | Exceptions | Page fault handler (cr2/eip dump, halt) | 2026-07-09 |
 | sys_exit | Process termination: ready-ring removal, switch via trap frame rewrite | 2026-07-10 |
 | sys_sleep | Tick-based sleep (SLEEPING state + wake_tick), idle process fallback | 2026-07-16 |
+| Initrd | USTAR tar parser (tar_lookup), named programs loaded from a single module | 2026-07-22 |
 
 ---
 

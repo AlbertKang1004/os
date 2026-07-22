@@ -9,6 +9,7 @@
 #include "../drivers/serial.h"
 #include "cpu.h"
 #include "debug.h"
+#include "initrd.h"
 #include "interrupt.h"
 #include "kmalloc.h"
 #include "multiboot.h"
@@ -164,18 +165,25 @@ void kmain() {
     
     unsigned int phys_end = (unsigned int)(unsigned long) &kernel_physical_end;
 
-    struct process * proc = process_create(module[0].mod_start, module[0].mod_end - module[0].mod_start);
-    struct process * proc2 = process_create(module[1].mod_start, module[1].mod_end - module[1].mod_start);   
-    struct process * idle = process_create(module[2].mod_start, module[2].mod_end - module[2].mod_start);   
-    scheduler_add(proc);
-    scheduler_add(proc2);
+    char * out;
+    unsigned int size_prog_a = tar_lookup((unsigned char *) module[0].mod_start + KERNEL_VIRTUAL_BASE, "prog_a", &out);
+    struct process * prog_a = process_create((unsigned int) out - KERNEL_VIRTUAL_BASE, size_prog_a);
+
+    unsigned int size_prog_b = tar_lookup((unsigned char *) module[0].mod_start + KERNEL_VIRTUAL_BASE, "prog_b", &out);
+    struct process * prog_b = process_create((unsigned int) out - KERNEL_VIRTUAL_BASE, size_prog_b);   
+
+    unsigned int size_idle   = tar_lookup((unsigned char *) module[0].mod_start + KERNEL_VIRTUAL_BASE, "idle", &out);
+    struct process * idle   = process_create((unsigned int) out - KERNEL_VIRTUAL_BASE, size_idle);   
+
+    scheduler_add(prog_a);
+    scheduler_add(prog_b);
     scheduler_set_idle(idle); // idle process
 
-    unsigned int entry  = proc->code_addr;
-    unsigned int ustack = proc->stack_addr;
-    unsigned int pd     = proc->page_directory;
-    write_cr3(pd);
+    unsigned int entry  = prog_a->code_addr;
+    unsigned int ustack = prog_a->stack_addr;
+    unsigned int pd     = prog_a->page_directory;
 
+    write_cr3(pd);
     enter_user_mode(entry, ustack);
 }
 
