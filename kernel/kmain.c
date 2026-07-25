@@ -113,7 +113,7 @@ void kmain() {
     gdt_set_entry(2, 0, 0xFFFFFFFF, 0x92, 0xCF);    // kernel data PL0
     gdt_set_entry(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);    // user code PL3
     gdt_set_entry(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);    // user data PL3
-    gdt_set_entry(5, (unsigned int) &tss, sizeof(tss) - 1, 0x89, 0x00);    // TSS selector
+    gdt_set_entry(5, (unsigned int)(unsigned long) &tss, sizeof(tss) - 1, 0x89, 0x00);    // TSS selector
 
     struct gdt_descriptor gdt_desc;
     gdt_desc.size = gdt_size - 1;
@@ -121,7 +121,7 @@ void kmain() {
     gdt_flush(&gdt_desc);
 
     // TSS setup
-    tss_init((unsigned int) &kernel_stack_top);
+    tss_init((unsigned int)(unsigned long) &kernel_stack_top);
 
     // Serial / framebuffer init
     fb_move_cursor(0);
@@ -162,26 +162,29 @@ void kmain() {
     for (unsigned int i = 0; i < mb->mods_count; i++) {
         pmm_reserve_region(module[i].mod_start, module[i].mod_end);
     }
-    
     unsigned int phys_end = (unsigned int)(unsigned long) &kernel_physical_end;
 
-    char * out;
-    unsigned int size_prog_a = tar_lookup((unsigned char *) module[0].mod_start + KERNEL_VIRTUAL_BASE, "prog_a", &out);
-    struct process * prog_a = process_create((unsigned int) out - KERNEL_VIRTUAL_BASE, size_prog_a);
+    // fetch processes from tar archive
+    unsigned char * archive = (unsigned char *)(unsigned long) module[0].mod_start + KERNEL_VIRTUAL_BASE;
+    initrd_init(archive);
+    const char *names[] = {"prog_a", "prog_b", "idle"};
+    unsigned int proc_count = sizeof(names)/sizeof(names[0]); 
+    struct process *procs[proc_count];
+    
+    char *out;
 
-    unsigned int size_prog_b = tar_lookup((unsigned char *) module[0].mod_start + KERNEL_VIRTUAL_BASE, "prog_b", &out);
-    struct process * prog_b = process_create((unsigned int) out - KERNEL_VIRTUAL_BASE, size_prog_b);   
+    for (int i = 0; i < proc_count; i++) {
+        unsigned int size_prog_a = tar_lookup((const char *)names[i], &out);
+        procs[i] = process_create((unsigned int)(unsigned long) out - KERNEL_VIRTUAL_BASE, size_prog_a);
+    }
+    
+    scheduler_add(procs[0]);
+    scheduler_add(procs[1]);
+    scheduler_set_idle(procs[2]); // idle process
 
-    unsigned int size_idle   = tar_lookup((unsigned char *) module[0].mod_start + KERNEL_VIRTUAL_BASE, "idle", &out);
-    struct process * idle   = process_create((unsigned int) out - KERNEL_VIRTUAL_BASE, size_idle);   
-
-    scheduler_add(prog_a);
-    scheduler_add(prog_b);
-    scheduler_set_idle(idle); // idle process
-
-    unsigned int entry  = prog_a->code_addr;
-    unsigned int ustack = prog_a->stack_addr;
-    unsigned int pd     = prog_a->page_directory;
+    unsigned int entry  = procs[0]->code_addr;
+    unsigned int ustack = procs[0]->stack_addr;
+    unsigned int pd     = procs[0]->page_directory;
 
     write_cr3(pd);
     enter_user_mode(entry, ustack);

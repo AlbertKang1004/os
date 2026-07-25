@@ -7,8 +7,20 @@ int syscall3(int num, int a, int b, int c) {
     return ret;
 }
 
+int read(int fd, void *buf, unsigned int count) {
+    return syscall3(SYS_READ, fd, (int)(unsigned long) buf, count);
+}
+
 int write(int fd, const void *buf, unsigned n) {
-    return syscall3(SYS_WRITE, fd, (int)buf, n);
+    return syscall3(SYS_WRITE, fd, (int)(unsigned long) buf, n);
+}
+
+int open(const char *filename, int flags, int mode) {
+    return syscall3(SYS_OPEN, (int)(unsigned long) filename, flags, mode);
+}
+
+int close(int fd) {
+    return syscall3(SYS_CLOSE, fd, 0, 0);
 }
 
 int sleep(unsigned int seconds) {

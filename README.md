@@ -28,6 +28,8 @@ Targets x86 (32-bit protected mode) with a higher-half kernel at 0xC0100000.
 | sys_exit | Process termination: ready-ring removal, switch via trap frame rewrite | 2026-07-10 |
 | sys_sleep | Tick-based sleep (SLEEPING state + wake_tick), idle process fallback | 2026-07-16 |
 | Initrd | USTAR tar parser (tar_lookup), named programs loaded from a single module | 2026-07-22 |
+| File Descriptors | Per-process fd table, type-tagged (file/serial/keyboard), stdin/stdout/stderr preopened | 2026-07-24 |
+| File I/O | open/read/close on initrd files, write dispatched by fd type | 2026-07-24 |
 
 ---
 

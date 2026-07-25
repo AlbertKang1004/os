@@ -6,6 +6,11 @@
 #include "../include/syscall_nums.h"
 #include "scheduler.h"
 #include "debug.h"
+#include "initrd.h"
+#include "process.h"
+#include "kmalloc.h"
+
+extern unsigned int multiboot_info_ptr;
 
 syscall_handler_t syscall_table[SYSCALL_TABLE_SIZE] = {
     [0] = sys_read,
@@ -19,33 +24,87 @@ syscall_handler_t syscall_table[SYSCALL_TABLE_SIZE] = {
 int sys_read(struct cpu_state * cpu, struct stack_state * stack) {
     (void) stack;
     unsigned int fd = cpu->ebx;
-    char *buf = (char *) cpu->ecx;
+    char *buf = (char *)(unsigned long) cpu->ecx;
     unsigned int count = cpu->edx;
-    return 0;
+
+    struct process *proc = scheduler_current();
+    if (fd >= FD_MAX || proc->fd_table[fd] == 0) return -1;
+    switch (proc->fd_table[fd]->type) {
+        case FD_SERIAL: return -1;
+        case FD_KEYBOARD: 
+            return 0; // TODO
+        case FD_TAR_FILE: {
+            struct fd * current_fd = proc->fd_table[fd];
+            unsigned char * pt = (unsigned char *)(unsigned long) current_fd->data + current_fd->offset;
+            if (count > current_fd->size - current_fd->offset)
+                count = current_fd->size - current_fd->offset;
+            kmemcpy(buf, pt, count);
+            current_fd->offset += count;
+            return count;
+        }
+        case FD_NONE: return -1;
+        default: return -1;
+    }
 }
 
 int sys_write(struct cpu_state * cpu, struct stack_state * stack) {
     (void) stack;
     unsigned int fd = cpu->ebx;
-    const char *buf = (const char *) cpu->ecx;
+    const char *buf = (const char *)(unsigned long) cpu->ecx;
     unsigned int count = cpu->edx;
-    for (unsigned int i = 0; i < count; i++) {
-        outb(SERIAL_COM1_BASE, buf[i]);
+
+
+    struct process *proc = scheduler_current();
+    if (fd >= FD_MAX || proc->fd_table[fd] == 0) return -1;
+    switch (proc->fd_table[fd]->type) {
+        case FD_SERIAL: 
+            for (unsigned int i = 0; i < count; i++) {
+                outb(SERIAL_COM1_BASE, buf[i]);
+            }
+            return count;
+        case FD_KEYBOARD: 
+        case FD_TAR_FILE: 
+        case FD_NONE: 
+        default: return -1;
     }
-    return 0;
 }
 
 int sys_open(struct cpu_state * cpu, struct stack_state * stack) {
     (void) stack;
-    const char *filename = (const char *) cpu->ebx;
+    const char *filename = (const char *)(unsigned long) cpu->ebx;
     int flags = cpu->ecx;
     int mode = cpu->edx;
-    return 0;
+    char *out;
+    int file_size = tar_lookup(filename, &out);
+    if (file_size == -1) { return -1; }
+    struct process *proc = scheduler_current();
+    int i;
+    for (i = 0; i < FD_MAX && proc->fd_table[i] != 0; i++);
+    if (i >= FD_MAX) return -1;
+
+    if ((proc->fd_table[i] = kmalloc(sizeof(*proc->fd_table[i]))) == 0) {
+        return -1; // failed to allocate space
+    }
+
+    struct fd * current_fd = proc->fd_table[i];
+    current_fd->type = FD_TAR_FILE;
+    current_fd->data = (unsigned int)(unsigned long) out;
+    current_fd->size = file_size;
+    current_fd->offset = 0;
+    current_fd->flags = 0;
+
+    return i;
 }
 
 int sys_close(struct cpu_state * cpu, struct stack_state * stack) {
     (void) stack;
     unsigned int fd = cpu->ebx;
+    struct process *proc = scheduler_current();
+
+    if (fd >= FD_MAX || proc->fd_table[fd] == 0) return -1;
+    kfree(proc->fd_table[fd]);
+    proc->fd_table[fd] = 0;
+    
     return 0;
 }
 

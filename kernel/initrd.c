@@ -14,6 +14,16 @@ struct tar_header
     char typeflag[1];
 };
 
+static unsigned char *archive_base;
+
+void initrd_init(unsigned char *base) { // setter
+    archive_base = base;
+}
+
+unsigned char * get_archive_base(void) { // getter
+    return archive_base;
+}
+
 /**
  * oct2bin:
  *   Converts a fixed-length octal ASCII string to an integer.
@@ -45,16 +55,16 @@ static int oct2bin(unsigned char *str, int size) {
  * @param out       On success, set to the address of the file's data
  * @return          The size of the file in bytes if found; -1 if not found
  */
-int tar_lookup(unsigned char *archive, char *filename, char **out) {
-    while (kstrcmp((char *) (archive + 257), "ustar") == 0) {
-        LOG_STR("filename", (char *) archive);
-        int file_size = oct2bin(archive + 124, 12);
-        if (kstrncmp((char *) archive, filename, 100) == 0) {
-            *out = (char *) archive + TAR_BLOCK_SIZE;
+int tar_lookup(const char *filename, char **out) {
+    while (kstrcmp((char *) (archive_base + 257), "ustar") == 0) {
+        LOG_STR("filename", (char *) filename);
+        int file_size = oct2bin(archive_base + 124, 12);
+        if (kstrncmp((char *) archive_base, filename, 100) == 0) {
+            *out = (char *) archive_base + TAR_BLOCK_SIZE;
             return file_size;
         }
         // go to next entry
-        archive += (TAR_BLOCK_SIZE + ((TAR_BLOCK_SIZE - 1 + file_size) / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE);
+        archive_base += (TAR_BLOCK_SIZE + ((TAR_BLOCK_SIZE - 1 + file_size) / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE);
     }
     return -1;
 }

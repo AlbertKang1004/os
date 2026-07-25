@@ -3,6 +3,7 @@
 #include "vmm.h"
 
 #define HEAP_START 0xC0800000
+#define MIN_BLOCK_SIZE 4
 
 static struct block_header *heap_start = 0;
 static unsigned int heap_next = HEAP_START; // tracking the next address for the new page
@@ -16,6 +17,7 @@ static unsigned int heap_next = HEAP_START; // tracking the next address for the
  * @return          Pointer to allocated memory, or 0 on failure
  */
 void *kmalloc(unsigned int size) {
+    if (size > 4096 - 2 * sizeof(struct block_header)) return 0;
     if (heap_start == 0) {
         // first call, initialize heap
         unsigned int phys = pmm_alloc();
@@ -33,16 +35,21 @@ void *kmalloc(unsigned int size) {
     // find first available space
     while (cur != 0){
         if (cur->free && cur->size >= size) {
-            struct block_header *next_block = (struct block_header*)((unsigned char *)cur + sizeof(struct block_header) + size);
-            next_block->size = cur->size - sizeof(struct block_header) - size;
-            next_block->free = 1; 
-            next_block->next = 0;
+            if (cur->size < size + sizeof(struct block_header) + MIN_BLOCK_SIZE) {
+                cur->free = 0;
+                return (void *)((unsigned char *)cur + sizeof(struct block_header));
+            } else {
+                struct block_header *next_block = (struct block_header*)((unsigned char *)cur + sizeof(struct block_header) + size);
+                next_block->size = cur->size - sizeof(struct block_header) - size;
+                next_block->free = 1; 
+                next_block->next = cur->next;
 
-            cur->size = size;
-            cur->free = 0;
-            cur->next = next_block;
+                cur->size = size;
+                cur->free = 0;
+                cur->next = next_block;
 
-            return (void *)((unsigned char *)cur + sizeof(struct block_header));
+                return (void *)((unsigned char *)cur + sizeof(struct block_header));
+            }
         }
         prev = cur;
         cur = cur->next;
@@ -51,6 +58,7 @@ void *kmalloc(unsigned int size) {
     // no space available in current block
     unsigned int new_phys = pmm_alloc();
     if (new_phys == 0) return 0;
+    heap_next += PAGE_SIZE;
     if (vmm_map_page(new_phys, heap_next, PAGE_PRESENT | PAGE_RW) < 0) return 0;
     cur = (struct block_header *)(unsigned long) heap_next;
     cur->size = size;
@@ -62,7 +70,6 @@ void *kmalloc(unsigned int size) {
     next_block->next = 0;
     cur->next = next_block;
     prev->next = cur;
-    heap_next += PAGE_SIZE;
     return (void *)((unsigned char *)cur + sizeof(struct block_header));
 }
 
@@ -76,9 +83,15 @@ void *kmalloc(unsigned int size) {
 void kfree(void *ptr) {
     if (ptr == 0) return;
     struct block_header *cur = (struct block_header *)((unsigned char *)ptr - sizeof(struct block_header));
-    if (cur->next != 0 && cur->next->free) { // if next block exists and next block is free
+    if (cur->next != 0 && cur->next->free && 
+        (unsigned char *) cur + sizeof(struct block_header) + cur->size == (unsigned char *) cur->next) {
+
+        // CONDITIONS
+        // 1. Does the next block exist?
+        // 2. Does the next block empty?
+        // 3. Are the two blocks physically adjacent?
         cur->size += cur->next->size + sizeof(struct block_header);
         cur->next = cur->next->next;
-    }
+    } 
     cur->free = 1;
 }

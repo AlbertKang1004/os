@@ -70,11 +70,25 @@ struct process *process_create(unsigned int binary_start, unsigned int binary_si
     __asm__ volatile("mov %0, %%cr3" : : "r"(saved_cr3) : "memory");
     struct process * proc = kmalloc(sizeof(struct process));
     if (proc == 0) return 0;
+
+    // initialization phase
     proc -> page_directory = new_pd_phys;
     proc -> code_addr = 0x00000000;
     proc -> stack_addr = 0xC0000000; // starts from top
     proc -> wake_tick = 0;
     proc -> state = PROCESS_READY;
+
+    kmemset(proc->fd_table, 0, sizeof(struct fd *) * FD_MAX);
+    for (int i = 0; i < 3; i++) {
+        struct fd * fd_entry = kmalloc(sizeof(struct fd));
+        if (fd_entry == 0) return 0;
+        fd_entry -> type = (i == 0) ? FD_KEYBOARD : FD_SERIAL;
+        fd_entry -> data = 0;
+        fd_entry -> size = 0;
+        fd_entry -> offset = 0;
+        fd_entry -> flags = 0;
+        proc -> fd_table[i] = fd_entry;
+    }
     proc -> next = 0; // NULL
 
     // save default state of the process

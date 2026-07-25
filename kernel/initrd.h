@@ -4,8 +4,7 @@
 #define TAR_BLOCK_SIZE 512
 #define TAR_NAME_SIZE 100
 
-int tar_lookup(unsigned char *archive, char *filename, char **out);
-
-
+void initrd_init(unsigned char *base);
+int tar_lookup(const char *filename, char **out);
 
 #endif

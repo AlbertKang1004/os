@@ -28,6 +28,8 @@ SHARED_OBJS = iso/modules/start.o \
 USER_PROGS = iso/modules/prog_a \
 			 iso/modules/prog_b \
 			 iso/modules/idle
+
+USER_FILES = iso/modules/hello.txt
 		  
 CC = gcc
 CFLAGS = -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector \
@@ -45,8 +47,8 @@ generate:
 $(USER_PROGS): iso/modules/%: iso/modules/%.o $(SHARED_OBJS)
 	ld -T user.ld -melf_i386 iso/modules/start.o $< iso/modules/ulib.o -o $@
 
-iso/modules/initrd.tar: $(USER_PROGS)
-	tar --format=ustar -cf $@ -C iso/modules $(notdir $(USER_PROGS))
+iso/modules/initrd.tar: $(USER_PROGS) $(USER_FILES)
+	tar --format=ustar -cf $@ -C iso/modules $(notdir $(USER_PROGS) $(USER_FILES))
 
 kernel.elf: $(OBJECTS)
 	ld $(LDFLAGS) $(OBJECTS) -o kernel.elf

@@ -186,3 +186,4 @@ void scheduler_sleep_current(struct cpu_state *cpu, struct stack_state *stack, u
     schedule(cpu, stack);
 }
 
+struct process *scheduler_current(void) { return current; } 
