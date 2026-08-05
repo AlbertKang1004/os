@@ -6,3 +6,4 @@
 iso/modules/prog_*
 !iso/modules/prog_*.c
 com1.out
+HANDOFF.md

@@ -7,7 +7,8 @@
 
 enum process_state {
     PROCESS_READY,
-    PROCESS_SLEEPING
+    PROCESS_SLEEPING,
+    PROCESS_BLOCKED
 } __attribute__((packed));
 
 enum fd_type {

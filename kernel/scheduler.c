@@ -104,7 +104,7 @@ void schedule(struct cpu_state *cpu, struct stack_state *stack) {
     
     *cpu = current->cpu;        // load saved cpu state
     *stack = current->stack;    // load saved stack state
-    LOG("process switch");
+    // LOG("process switch");
     // tss.esp0 remains the same since all the process use the same kernel stack
 
     // TO BE IMPLEMENTED
@@ -139,7 +139,7 @@ void scheduler_exit_current(struct cpu_state *cpu, struct stack_state *stack) {
     if (current->next == current) { // only 1 process in the list
         current = 0;
         tail = 0;
-        LOG("No process, stop.");
+        // LOG("No process, stop.");
         for (;;) { // stop all system, no process left
             cli();
             hlt();
@@ -156,7 +156,7 @@ void scheduler_exit_current(struct cpu_state *cpu, struct stack_state *stack) {
     current = pick_next(prev->next);    
     kfree(temp);
     process_count--;
-    LOG("Moving to next process.");
+    // LOG("Moving to next process.");
     write_cr3(current->page_directory);
     *cpu = current->cpu;
     *stack = current->stack;
@@ -184,6 +184,32 @@ void scheduler_sleep_current(struct cpu_state *cpu, struct stack_state *stack, u
     current->state = PROCESS_SLEEPING;
     current->wake_tick = get_current_tick() + tick;
     schedule(cpu, stack);
+}
+
+/**
+ * scheduler_wake_blocked:
+ *   Marks every BLOCKED process in the ready ring as READY. Called from
+ *   interrupt context when input arrives, so it only flips state -- the
+ *   actual switch happens on the next timer tick.
+ *
+ *   Wakes all blocked processes regardless of what they were waiting for,
+ *   since there are no per-resource wait queues yet. That is safe because
+ *   a blocking syscall restarts from scratch: a process woken for the
+ *   wrong reason simply finds nothing and blocks again.
+ */
+void scheduler_wake_blocked(void) {
+    // wait queue not implemented yet, so we are using this temporary approach
+    // where we just traverse the linked list and change every blocked process
+    // to be processes that's ready to run.
+    struct process *start = (current == idle) ? tail : current;
+    if (start == 0) return;            // ring is empty
+
+    struct process *p = start;
+    do {
+        if (p->state == PROCESS_BLOCKED)
+            p->state = PROCESS_READY;
+        p = p->next;
+    } while (p != start);              // compare with start
 }
 
 struct process *scheduler_current(void) { return current; } 

@@ -10,7 +10,7 @@ static volatile unsigned int ticks = 0;
 static void pit_interrupt_handler(struct cpu_state *cpu, struct stack_state *stack, unsigned int interrupt) {
     ticks++;
     if (ticks % TICKS_PER_SEC == 0) { // wait 1 second
-        LOG_HEX("tick", ticks);
+        // LOG_HEX("tick", ticks);
     }
     pic_acknowledge(interrupt);
     if (stack->cs & 0x3 && ticks % SCHEDULER_QUANTUM == 0) 
