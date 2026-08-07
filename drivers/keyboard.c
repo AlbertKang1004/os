@@ -1,7 +1,7 @@
 #include "../lib/io.h"
 #include "../kernel/debug.h"
 #include "../kernel/interrupt.h"
-#include "../kernel/scheduler.h"
+#include "../kernel/wait.h"
 #include "keyboard.h"
 #include "pic.h"
 
@@ -10,6 +10,7 @@ static unsigned char mods;
 static unsigned char buf[128];
 static unsigned int read_pos = 0;
 static unsigned int write_pos = 0;
+static struct wait_queue kbd_queue;
 
 static inline void set_mod(unsigned char key, int released) {
     mods = released ? mods & ~key : mods | key;
@@ -78,8 +79,17 @@ static int keyboard_write(unsigned char c) {
     if (write_pos - read_pos == 128) // when the queue is full
         return -1;
     buf[write_pos++ & 127] = c;
-    scheduler_wake_blocked();
+    wait_queue_wake(&kbd_queue);
     return 0;
+}
+
+/** read_scan_code:
+ *  Reads a scan code from the keyboard
+ *
+ *  @return The scan code (NOT an ASCII character!)
+ */
+static unsigned char read_scan_code(void) {
+    return inb(KBD_DATA_PORT);
 }
 
 /** keyboard_read:
@@ -176,15 +186,10 @@ static void keyboard_interrupt_handler(struct cpu_state * cpu, struct stack_stat
     pic_acknowledge(interrupt);
 }
 
-/** read_scan_code:
- *  Reads a scan code from the keyboard
- *
- *  @return The scan code (NOT an ASCII character!)
- */
-unsigned char read_scan_code(void) {
-    return inb(KBD_DATA_PORT);
-}
-
 void keyboard_init() {
     register_interrupt_handler(0x21, keyboard_interrupt_handler);
+}
+
+void keyboard_wait(struct cpu_state * cpu, struct stack_state * stack) {
+    wait_queue_block(&kbd_queue, cpu, stack);
 }

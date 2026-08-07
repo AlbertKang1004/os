@@ -3,6 +3,7 @@
 #include "gdt.h"
 #include "interrupt.h"
 #include "interrupt_handlers.h"
+#include "../drivers/fb.h"
 #include "../drivers/pic.h"
 #include "../drivers/pit.h"
 #include "../drivers/keyboard.h"
@@ -33,53 +34,6 @@ extern void enter_user_mode(unsigned int entry, unsigned int user_stack);
 
 typedef void (*call_module_t) (void);
 struct idt_entry idt[256];
-
-char *fb = (char *) 0xC00B8000;
-
-/* =============== FRAMEBUFFER ================ */
-
-/** fb_write_cell:
- *  Writes a character with colors to a cell in the framebuffer
- *
- *  @param i    The index of the cell
- *  @param c    The character to write
- *  @param bg   The background color
- *  @param fg   The foreground color
- */
-void fb_write_cell(unsigned int i, char c, unsigned char bg, unsigned char fg) {
-	fb[i] = c;
-	fb[i + 1] = ((bg & 0x0F) << 4 | (fg & 0x0F));
-}
-
-/** fb_move_cursor:
- *  Moves the cursor of the framebuffer to the given position
- *
- *  @param pos The new position of the cursor
- */
-void fb_move_cursor(unsigned short pos)
-{
-	outb(FB_COMMAND_PORT, FB_HIGH_BYTE_COMMAND);
-	outb(FB_DATA_PORT,    ((pos >> 8) & 0x00FF));
-	outb(FB_COMMAND_PORT, FB_LOW_BYTE_COMMAND);
-	outb(FB_DATA_PORT,    pos & 0x00FF);
-}
-
-/** fb_write:
- *  Writes a text to the framebuffer.
- * 	@param  text 	The text to be written 
- *  @param  bg   	Background Color
- *  @param  fg   	Text Color
- *  @param  offset  The offset for the text to be written
- *  @return  0 if successfully written
- * 			 1 if not
- */
-int fb_write(char* text, unsigned char bg, unsigned char fg, unsigned int offset) {
-	while (*text != 0) {
-		fb[offset++] = *text++;
-		fb[offset++] = ((bg & 0x0F) << 4 | (fg & 0x0F));
-	}
-	return 0;
-}
 
 /* ================ INTERRUPT ================= */
 
@@ -124,10 +78,10 @@ void kmain() {
     tss_init((unsigned int)(unsigned long) &kernel_stack_top);
 
     // Serial / framebuffer init
-    fb_move_cursor(0);
+    fb_clear();
     serial_configure_baud_rate(SERIAL_COM1_BASE, 1);
     serial_configure_line(SERIAL_COM1_BASE);
-    fb_write("Hello People and Computers.\n", COLOR_CYAN, COLOR_BLACK, 0);
+    // fb_write("Hello People and Computers.\n", COLOR_CYAN, COLOR_BLACK, 0);
 
     // IDT setup
     for (int i = 0; i < 256; i++) {
@@ -156,6 +110,9 @@ void kmain() {
     pmm_reserve_region(mb->mmap_addr, mb->mmap_addr + mb->mmap_length);
 
     // testing goes here...
+    for (int i = 0; i < 8; i++)
+        fb_write("1234567890", 10);
+    fb_write("a", 1);
 
     // Jump to user module
     multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (mb->mods_addr + KERNEL_VIRTUAL_BASE);

@@ -17,6 +17,8 @@ OBJECTS = boot/loader.o \
 		  kernel/utils.o \
 		  kernel/usermode.o \
 		  kernel/vmm.o \
+		  kernel/wait.o \
+		  drivers/fb.o \
           drivers/pic.o \
 		  drivers/pit.o \
           drivers/keyboard.o \

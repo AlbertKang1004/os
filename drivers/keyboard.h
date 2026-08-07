@@ -11,8 +11,11 @@
 #define MOD_RALT    (1 << 5)
 #define MOD_CAPS    (1 << 6)
 
-unsigned char read_scan_code(void);
+struct cpu_state;
+struct stack_state;
+
 void keyboard_init(void);
 int keyboard_read(void);
+void keyboard_wait(struct cpu_state * cpu, struct stack_state * stack);
 
 #endif

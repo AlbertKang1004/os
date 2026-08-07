@@ -9,7 +9,7 @@ Targets x86 (32-bit protected mode) with a higher-half kernel at 0xC0100000.
 
 | Component | Description | Date Added |
 |-----------|-------------|------------|
-| Framebuffer | Text output to screen | 2025-05-19 |
+| Framebuffer | Text output to screen | 2026-05-19 |
 | GDT | Global Descriptor Table | 2026-05-21 |
 | IDT | Interrupt Descriptor Table | 2026-05-22 |
 | PIC | Programmable Interrupt Controller | 2026-05-22 |
@@ -33,6 +33,8 @@ Targets x86 (32-bit protected mode) with a higher-half kernel at 0xC0100000.
 | Keyboard Decoder | Scancode set 1 state machine: make/break, 0xE0 prefix, shift/ctrl/alt/caps | 2026-08-04 |
 | Input Buffer | 128-byte ring buffer, free-running indices, drops on overflow | 2026-08-04 |
 | Blocking Read | BLOCKED state, syscall restart via eip rewind, wake from IRQ1 | 2026-08-04 |
+| Wait Queues | Generic block/wake list, driver decoupled from the scheduler | 2026-08-06 |
+| Console | Framebuffer driver: cursor, control characters, scrolling; sys_write goes to screen and serial | 2026-08-07 |
 
 ---
 
@@ -45,7 +47,8 @@ Legend: unmarked = done &nbsp;·&nbsp; `+` added most recently &nbsp;·&nbsp; `!
   ├── boot/
   │   └── loader.s                  # multiboot header, kernel entry point
   ├── drivers/
-+ │   ├── keyboard.c/.h             # scancode decoder + input ring buffer
++ │   ├── fb.c/.h                   # VGA text console: cursor, control chars, scrolling
+  │   ├── keyboard.c/.h             # scancode decoder + input ring buffer
   │   ├── pic.c/.h                  # 8259 PIC remap
   │   ├── pit.c/.h                  # 1000 Hz timer (1 tick = 1ms)
   │   └── serial.c/.h               # COM1 output
@@ -63,10 +66,11 @@ Legend: unmarked = done &nbsp;·&nbsp; `+` added most recently &nbsp;·&nbsp; `!
   │   ├── pmm.c/.h                  # physical memory manager (bitmap)
   │   ├── vmm.c/.h                  # virtual memory manager (recursive mapping)
   │   ├── kmalloc.c/.h              # first-fit kernel heap
-+ │   ├── process.c/.h              # process_create, PCB, fd table
+  │   ├── process.c/.h              # process_create, PCB, fd table
 ! │   ├── scheduler.c/.h            # round-robin ring, sleep/exit/wake - no kernel<->user switch yet
-+ │   ├── syscall.c/.h              # int 0x80 dispatch, open/read/write/close, blocking read
-+ │   ├── initrd.c/.h               # USTAR tar parser (tar_lookup)
++ │   ├── wait.c/.h                 # wait queues: block/wake without touching the scheduler
+  │   ├── syscall.c/.h              # int 0x80 dispatch, open/read/write/close, blocking read
+  │   ├── initrd.c/.h               # USTAR tar parser (tar_lookup)
   │   ├── usermode.s                # ring 3 entry
   │   ├── utils.c/.h                # kmemcpy, kstrcmp, print_hex
   │   ├── cpu.h                     # cr2/cr3, cli/hlt inline helpers
@@ -79,7 +83,7 @@ Legend: unmarked = done &nbsp;·&nbsp; `+` added most recently &nbsp;·&nbsp; `!
   │   ├── prog_a.c                  # test program
   │   ├── prog_b.c                  # test program
   │   ├── idle.c                    # idle loop
-+ │   ├── hello.txt                 # sample data file read through the fd layer
+  │   ├── hello.txt                 # sample data file read through the fd layer
 @@│   └── shell.c                   # NEXT - prompt, ls, cat, run programs by name @@
   ├── generate_idt.py               # emits interrupt_handlers.*
   ├── link.ld                       # kernel linker script (higher half)

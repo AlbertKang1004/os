@@ -89,7 +89,8 @@ struct process *process_create(unsigned int binary_start, unsigned int binary_si
         fd_entry -> flags = 0;
         proc -> fd_table[i] = fd_entry;
     }
-    proc -> next = 0; // NULL
+    proc -> next = 0;       // NULL
+    proc -> wait_next = 0;  // NULL
 
     // save default state of the process
     struct stack_state stack;

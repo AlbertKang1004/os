@@ -4,6 +4,7 @@
 #include "../drivers/pit.h"
 #include "../lib/io.h"
 #include "../drivers/serial.h"
+#include "../drivers/fb.h"
 #include "../include/syscall_nums.h"
 #include "scheduler.h"
 #include "debug.h"
@@ -58,9 +59,8 @@ int sys_read(struct cpu_state * cpu, struct stack_state * stack) {
                 buf++, size++;
             }
             if (size == 0) { // block the process
-                proc->state = PROCESS_BLOCKED;
-                stack->eip -= 2; // since read() is not completed yet
-                schedule(cpu, stack);
+
+                keyboard_wait(cpu, stack);
             }
             return size;
         }
@@ -79,8 +79,8 @@ int sys_read(struct cpu_state * cpu, struct stack_state * stack) {
 }
 
 /** sys_write:
- *  Writes `count` bytes from the user buffer. Only serial descriptors
- *  accept writes; tar files live in the initrd image and are read-only.
+ *  Writes `count` bytes from the user buffer. 
+ *  tar files live in the initrd image and are read-only.
  *
  *  @param cpu  ebx = fd, ecx = user buffer, edx = byte count.
  *  @return     Bytes written, or -1 for a bad fd or a read-only type.
@@ -94,10 +94,11 @@ int sys_write(struct cpu_state * cpu, struct stack_state * stack) {
     struct process *proc = scheduler_current();
     if (fd >= FD_MAX || proc->fd_table[fd] == 0) return -1;
     switch (proc->fd_table[fd]->type) {
-        case FD_SERIAL: 
+        case FD_SERIAL:
             for (unsigned int i = 0; i < count; i++) {
                 outb(SERIAL_COM1_BASE, buf[i]);
             }
+            fb_write(buf, count);
             return count;
         case FD_KEYBOARD: 
         case FD_TAR_FILE: 

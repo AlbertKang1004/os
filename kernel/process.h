@@ -37,6 +37,7 @@ struct process {
     struct stack_state stack;     // saved stack state
     struct fd * fd_table[FD_MAX];     // file descriptor array
     struct process * next;        // next process
+    struct process * wait_next;   // next process in the current wait queue
 } __attribute__((packed));
 
 struct process *process_create(unsigned int binary_start, unsigned int binary_size);

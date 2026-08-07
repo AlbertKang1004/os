@@ -186,30 +186,4 @@ void scheduler_sleep_current(struct cpu_state *cpu, struct stack_state *stack, u
     schedule(cpu, stack);
 }
 
-/**
- * scheduler_wake_blocked:
- *   Marks every BLOCKED process in the ready ring as READY. Called from
- *   interrupt context when input arrives, so it only flips state -- the
- *   actual switch happens on the next timer tick.
- *
- *   Wakes all blocked processes regardless of what they were waiting for,
- *   since there are no per-resource wait queues yet. That is safe because
- *   a blocking syscall restarts from scratch: a process woken for the
- *   wrong reason simply finds nothing and blocks again.
- */
-void scheduler_wake_blocked(void) {
-    // wait queue not implemented yet, so we are using this temporary approach
-    // where we just traverse the linked list and change every blocked process
-    // to be processes that's ready to run.
-    struct process *start = (current == idle) ? tail : current;
-    if (start == 0) return;            // ring is empty
-
-    struct process *p = start;
-    do {
-        if (p->state == PROCESS_BLOCKED)
-            p->state = PROCESS_READY;
-        p = p->next;
-    } while (p != start);              // compare with start
-}
-
 struct process *scheduler_current(void) { return current; } 
