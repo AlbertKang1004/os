@@ -3,7 +3,10 @@
 *.iso
 *.elf
 *.tar
-iso/modules/prog_*
-!iso/modules/prog_*.c
+iso/modules/*
+!iso/modules/*.c
+!iso/modules/*.h
+!iso/modules/*.s
+!iso/modules/*.txt
 com1.out
 HANDOFF.md

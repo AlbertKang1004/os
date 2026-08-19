@@ -56,15 +56,15 @@ static int oct2bin(unsigned char *str, int size) {
  * @return          The size of the file in bytes if found; -1 if not found
  */
 int tar_lookup(const char *filename, char **out) {
-    while (kstrcmp((char *) (archive_base + 257), "ustar") == 0) {
-        LOG_STR("filename", (char *) filename);
-        int file_size = oct2bin(archive_base + 124, 12);
-        if (kstrncmp((char *) archive_base, filename, 100) == 0) {
-            *out = (char *) archive_base + TAR_BLOCK_SIZE;
+    unsigned char * current = archive_base;
+    while (kstrcmp((char *) (current + 257), "ustar") == 0) {
+        int file_size = oct2bin(current + 124, 12);
+        if (kstrncmp((char *) current, filename, 100) == 0) {
+            *out = (char *) current + TAR_BLOCK_SIZE;
             return file_size;
         }
         // go to next entry
-        archive_base += (TAR_BLOCK_SIZE + ((TAR_BLOCK_SIZE - 1 + file_size) / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE);
+        current += (TAR_BLOCK_SIZE + ((TAR_BLOCK_SIZE - 1 + file_size) / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE);
     }
     return -1;
 }

@@ -27,7 +27,8 @@ syscall_handler_t syscall_table[SYSCALL_TABLE_SIZE] = {
     [2] = sys_open,
     [3] = sys_close,
     [4] = sys_exit,
-    [5] = sys_nanosleep
+    [5] = sys_nanosleep,
+    [6] = sys_readdir
 };
 
 /** sys_read:
@@ -163,6 +164,26 @@ int sys_close(struct cpu_state * cpu, struct stack_state * stack) {
     proc->fd_table[fd] = 0;
     
     return 0;
+}
+
+/** sys_readdir:
+ *  Copies the name of the index-th entry of the initrd into a user buffer.
+ *  There are no directories yet, so the archive itself is the only thing
+ *  that can be listed and no path argument is needed. The name is COPIED
+ *  rather than returned by pointer: the archive lives above 0xC0000000 in
+ *  pages mapped without PAGE_USER, so a kernel pointer would be unusable
+ *  and unsafe in ring 3.
+ *
+ *  Walking from the start on every call is O(n) per entry, which is the
+ *  price of keeping the call stateless -- an iterator would need somewhere
+ *  per-process to live, which is exactly why opendir returns a descriptor.
+ *
+ *  @param cpu  ebx = entry index, ecx = user buffer, edx = buffer size.
+ *  @return     Length of the name copied, or -1 once the index is past the
+ *              last entry (which is how a caller knows to stop).
+ */
+int sys_readdir(struct cpu_state * cpu, struct stack_state * stack) {
+    
 }
 
 /** sys_exit:

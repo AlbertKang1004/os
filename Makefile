@@ -29,6 +29,7 @@ SHARED_OBJS = iso/modules/start.o \
 
 USER_PROGS = iso/modules/prog_a \
 			 iso/modules/prog_b \
+			 iso/modules/shell \
 			 iso/modules/idle
 
 USER_FILES = iso/modules/hello.txt

@@ -54,37 +54,39 @@ void *kmemcpy(void *dest, const void *src, unsigned int size) {
  *              a positive value if s1 is greater than s2
  */
 int kstrcmp(const char *s1, const char *s2) {
-    while (*s1 != 0 && *s2 != 0) {
-        if (*s1 != *s2) { // two strings are different
-            return (int) *s1 - *s2;
-        }   
-        s1++;
-        s2++;
+    while (*s1 != 0 && *s1 == *s2) { 
+        s1++, s2++;
     }
-    if (*s1 == *s2) {
-        return 0;
-    }
-    else {
-        return (int) *s1 - *s2;
-    }    
+    return (int) *s1 - *s2;   
 }
 
+/**
+ * kstrncmp:
+ *   Like kstrcmp but stops after n characters. Passing the width of a
+ *   fixed-size field (a tar name is 100 bytes) rather than the key length
+ *   is what makes this an equality test: the key's own terminator ends the
+ *   comparison, so "she" no longer matches a header called "shell".
+ *
+ * @param s1    First string
+ * @param s2    Second string
+ * @param n     Maximum number of characters to compare
+ * @return      0 if the first n characters match, otherwise their difference
+ */
 int kstrncmp(const char *s1, const char *s2, unsigned int n) {
-    while (*s1 != 0 && *s2 != 0 && n > 0) {
-        if (*s1 != *s2) { // two strings are different
-            return (int) *s1 - *s2;
-        }   
-        s1++;
-        s2++;
-        n--;
+    while (n > 0 && *s1 != 0 && *s1 == *s2) { 
+        s1++, s2++, n--;
     }
-    if (n > 0) {
-        return (int) *s1 - *s2;
-    } else {
-        return 0;
-    }
+    return (n > 0) ? (int) *s1 - *s2 : 0;   
 }
 
+/**
+ * kstrlen:
+ *   Counts the characters before the terminator. The terminator itself is
+ *   not counted, so a buffer holding the string needs kstrlen(s) + 1 bytes.
+ *
+ * @param s     A null-terminated string
+ * @return      Its length in characters
+ */
 int kstrlen(const char *s) {
     int count = 0;
     while (*s != 0) {

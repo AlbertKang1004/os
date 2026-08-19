@@ -110,9 +110,9 @@ void kmain() {
     pmm_reserve_region(mb->mmap_addr, mb->mmap_addr + mb->mmap_length);
 
     // testing goes here...
-    for (int i = 0; i < 8; i++)
-        fb_write("1234567890", 10);
-    fb_write("a", 1);
+    // for (int i = 0; i < 8; i++)
+    //     fb_write("1234567890", 10);
+    // fb_write("a", 1);
 
     // Jump to user module
     multiboot_module_t *module = (multiboot_module_t *)(unsigned long) (mb->mods_addr + KERNEL_VIRTUAL_BASE);
@@ -124,24 +124,28 @@ void kmain() {
     // fetch processes from tar archive
     unsigned char * archive = (unsigned char *)(unsigned long) module[0].mod_start + KERNEL_VIRTUAL_BASE;
     initrd_init(archive);
-    const char *names[] = {"prog_a", "prog_b", "idle"};
+    const char *names[] = {"idle", "shell"};
     unsigned int proc_count = sizeof(names)/sizeof(names[0]); 
     struct process *procs[proc_count];
     
     char *out;
 
     for (int i = 0; i < proc_count; i++) {
-        unsigned int size_prog_a = tar_lookup((const char *)names[i], &out);
+        int size_prog_a = tar_lookup((const char *)names[i], &out);
+        if (size_prog_a == -1) {
+            LOG_STR("tar_lookup failed", names[i]);
+            return;
+        }
         procs[i] = process_create((unsigned int)(unsigned long) out - KERNEL_VIRTUAL_BASE, size_prog_a);
     }
     
-    scheduler_add(procs[0]);
-    scheduler_add(procs[1]);
-    scheduler_set_idle(procs[2]); // idle process
+    scheduler_set_idle(procs[0]); // idle process
+    for (unsigned int i = 1; i < proc_count; i++)  
+        scheduler_add(procs[i]);
 
-    unsigned int entry  = procs[0]->code_addr;
-    unsigned int ustack = procs[0]->stack_addr;
-    unsigned int pd     = procs[0]->page_directory;
+    unsigned int entry  = procs[1]->code_addr;
+    unsigned int ustack = procs[1]->stack_addr;
+    unsigned int pd     = procs[1]->page_directory;
 
     write_cr3(pd);
     enter_user_mode(entry, ustack);
